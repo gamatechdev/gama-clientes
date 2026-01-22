@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -316,6 +317,9 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
             warningLimit.setDate(today.getDate() + 30);
 
             fetchedDocs.forEach(doc => {
+               // Ignore LTCAT (53) for dashboard alerts/stats
+               if (doc.tipo_doc === 53) return;
+
                if (doc.validade) {
                   const valDate = new Date(doc.validade);
                   // If expired OR expiring soon
@@ -760,7 +764,25 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
                                          {DOC_DEFINITIONS.map((def) => {
                                              // Find real doc
                                              const doc = documents.find(d => d.unidade_id === unit.id && d.tipo_doc === def.typeId);
-                                             const { status, label, color } = getDocStatus(doc?.validade, doc?.doc_url);
+                                             
+                                             let status, label, color;
+
+                                             if (def.typeId === 53) { // LTCAT specific logic
+                                                if (doc?.doc_url) {
+                                                    status = 'active';
+                                                    label = 'Disponível';
+                                                    color = 'bg-blue-50 text-blue-700 border-blue-100';
+                                                } else {
+                                                    status = 'missing';
+                                                    label = 'Não Possui';
+                                                    color = 'bg-gray-100 text-gray-400 border-gray-200';
+                                                }
+                                             } else {
+                                                const result = getDocStatus(doc?.validade, doc?.doc_url);
+                                                status = result.status;
+                                                label = result.label;
+                                                color = result.color;
+                                             }
 
                                              return (
                                                  <div key={`${unit.id}-${def.id}`} className="p-6 rounded-2xl bg-white border border-gray-200 hover:border-[#04a7bd]/30 hover:shadow-lg transition-all flex flex-col h-full">
@@ -778,7 +800,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
                                                      <div className="mb-4">
                                                         <span className="text-[10px] text-gray-400 uppercase font-bold">Validade</span>
                                                         <p className={`font-bold ${status === 'expired' ? 'text-red-500' : 'text-[#050a30]'}`}>
-                                                            {formatDate(doc?.validade || null)}
+                                                            {def.typeId === 53 ? (doc?.validade ? formatDate(doc.validade) : 'Indeterminada') : formatDate(doc?.validade || null)}
                                                         </p>
                                                      </div>
                                                      

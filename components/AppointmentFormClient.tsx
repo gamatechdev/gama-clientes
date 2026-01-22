@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button, Input } from './ui/GlassComponents';
@@ -12,6 +13,7 @@ interface Colaborador {
   data_nascimento: string;
   sexo: string;
   setor?: string;
+  setorid?: number;
   cargo?: number;
   unidade?: number;
   cargos?: { nome: string };
@@ -297,6 +299,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       }
 
       setClientId(userProfile.cliente_id);
+      console.log("LOG: Empresa Logada ID:", userProfile.cliente_id);
 
       // Fetch Units
       const { data: units } = await supabase
@@ -306,21 +309,28 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
 
       const myUnits = units || [];
       setUnidades(myUnits);
+      console.log("LOG: Unidades encontradas:", myUnits.map(u => u.nome_unidade));
 
-      // Fetch Collaborators
+      // Fetch Collaborators from COLABORADORES TABLE (Search Source)
       if (myUnits.length > 0) {
         const unitIds = myUnits.map(u => u.id);
+        
+        console.log("LOG: Buscando colaboradores na tabela 'colaboradores' para as unidades:", unitIds);
+        
         const { data: colabs } = await supabase
           .from('colaboradores')
-          .select('id, nome, cpf, data_nascimento, sexo, setor, cargo, cargos(nome), unidade')
+          .select('id, nome, cpf, data_nascimento, sexo, setor, setorid, cargo, cargos(nome), unidade')
           .in('unidade', unitIds);
         
+        console.log("LOG: Total de colaboradores carregados para busca:", colabs?.length || 0);
+
         // @ts-ignore
         setColaboradores(colabs || []);
 
-        // Fetch Agenda
+        // Fetch Agenda (For Display Only)
         fetchAgenda(unitIds);
       } else {
+        console.log("LOG: Nenhuma unidade vinculada, impossível buscar colaboradores.");
         setColaboradores([]);
       }
 
@@ -353,7 +363,6 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       setAgenda(data || []);
   };
 
-  // Helper Date Formatter (Prevents Timezone shift issues)
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '-';
     // Split YYYY-MM-DD manually to avoid UTC conversion issues
@@ -437,10 +446,11 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   // --- Selection Handler ---
 
   const handleSelectColab = async (colab: Colaborador) => {
+    console.log("LOG: Colaborador selecionado:", colab.nome, "| ID:", colab.id);
     setSelectedColabId(colab.id);
     setMode('form');
 
-    // 1. Set Unit (This triggers hierarchy load logic implicitly if we call helper)
+    // 1. Set Unit and Load Hierarchy (Sectors for this unit)
     let currentUnitId = colab.unidade;
     
     // Default to the first unit if colab has none (edge case) or use theirs
@@ -452,45 +462,28 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
             setUnitSearchTerm(u.nome_unidade);
             setAppointmentData(prev => ({ ...prev, unidade: u.id.toString(), unidadeId: u.id }));
             
-            // Load Sectors for this unit
+            // Load Sectors for this unit to populate dropdown
             const sectors = await loadSectorsForUnit(u.id);
             setFilteredSectors(sectors);
 
-            // 2. Set Sector if valid
-            let sectorIdFound = '';
-            if (colab.setor) {
-                // Try to match sector name to options
-                const matchedSector = sectors.find(s => s.label.toLowerCase() === colab.setor?.toLowerCase());
-                if (matchedSector) {
-                    sectorIdFound = matchedSector.id.toString();
-                    
-                    // Load Roles for this sector
-                    const roles = await loadRolesForSector(Number(matchedSector.id));
-                    setFilteredRoles(roles);
+            // 2. Clear Roles (since we are resetting sector selection visually)
+            setFilteredRoles([]);
 
-                     // 3. Set Role if valid
-                     let cargoIdFound = '';
-                     if (colab.cargos?.nome) {
-                         const matchedRole = roles.find(r => r.label.toLowerCase() === colab.cargos?.nome.toLowerCase());
-                         if (matchedRole) cargoIdFound = matchedRole.id.toString();
-                     } else if (colab.cargo) {
-                         const matchedRole = roles.find(r => Number(r.id) === colab.cargo);
-                         if (matchedRole) cargoIdFound = matchedRole.id.toString();
-                     }
-                     
-                     setColabFormData(prev => ({ ...prev, funcao: colab.cargos?.nome || '', cargoId: cargoIdFound }));
-                }
-            }
-            
+            // 3. Set Form Data - Force Sector/Cargo to be BLANK as requested
             setColabFormData(prev => ({
                 ...prev,
+                // Personal data (keep)
                 nome: colab.nome,
                 // Apply mask to the CPF coming from DB for display
                 cpf: applyCPFMask(colab.cpf || ''),
                 data_nascimento: colab.data_nascimento,
                 sexo: colab.sexo || 'M',
-                setor: colab.setor || '',
-                setorId: sectorIdFound
+
+                // Hierarchy data (BLANK AS REQUESTED)
+                setor: '',
+                setorId: '',
+                funcao: '',
+                cargoId: ''
             }));
         }
     }
@@ -627,6 +620,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         data_nascimento: colabFormData.data_nascimento,
         sexo: colabFormData.sexo,
         setor: colabFormData.setor, // Stores name
+        setorid: colabFormData.setorId ? Number(colabFormData.setorId) : null,
         unidade: appointmentData.unidadeId,
         cargo: Number(colabFormData.cargoId)
       };
@@ -683,7 +677,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       backToSearch(); // Go back to search
       
       // Background refresh colabs
-      const { data: colabs } = await supabase.from('colaboradores').select('id, nome, cpf, data_nascimento, sexo, setor, cargo, cargos(nome), unidade').in('unidade', unidades.map(u => u.id));
+      const { data: colabs } = await supabase.from('colaboradores').select('id, nome, cpf, data_nascimento, sexo, setor, setorid, cargo, cargos(nome), unidade').in('unidade', unidades.map(u => u.id));
       // @ts-ignore
       if (colabs) setColaboradores(colabs);
 
@@ -702,7 +696,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       (c.cpf && (c.cpf || '').includes(colabSearchTerm || ''))
   );
 
-  // --- Agenda Grouping Logic ---
+  // --- Agenda Grouping Logic (Restored) ---
   const getGroupedAgenda = () => {
      const groups: Record<string, AgendaItem[]> = {};
      agenda.forEach(item => {
@@ -963,7 +957,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
             </GlassCard>
         </div>
 
-        {/* RIGHT COLUMN: AGENDA (Adjusted Width) */}
+        {/* RIGHT COLUMN: AGENDA (Restored Data) */}
         <div className="lg:col-span-7 xl:col-span-8 w-full h-full flex flex-col">
             <GlassCard className="p-6 h-full min-h-[600px] flex flex-col">
                 <div className="flex justify-between items-center mb-6">

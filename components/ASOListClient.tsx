@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
-import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus, Filter } from 'lucide-react';
 
 // --- Interfaces ---
 
@@ -115,7 +116,7 @@ const HistoryModal = ({ isOpen, colaborador, onClose }: { isOpen: boolean, colab
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-gray-500">
-                                            <MapPin size={10} /> {item.unidade_info.nome_unidade}
+                                            <MapPin size={10} /> {item.unidade_info?.nome_unidade || 'Unidade'}
                                         </div>
                                     </div>
                                 </div>
@@ -143,6 +144,7 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const [loading, setLoading] = useState(true);
   const [collaborators, setCollaborators] = useState<ColaboradorData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'valid' | 'expiring' | 'expired' | 'pending'>('all');
   
   // Modal State
   const [selectedColab, setSelectedColab] = useState<ColaboradorData | null>(null);
@@ -166,14 +168,24 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
       if (!units || units.length === 0) { setLoading(false); return; }
       const unitIds = units.map(u => u.id);
 
-      // 3. Get Reference Tables (Setor & Cargo_Setor) to calculate periodicity
-      // We need to fetch all sectors to map names to IDs
+      // 3. Get Reference Tables
       const { data: setores } = await supabase.from('setor').select('id, nome');
-      
-      // We need cargo_setor to get periodicity
       const { data: cargoSetorRules } = await supabase.from('cargo_setor').select('idsetor, idcargo, periodicidade');
 
-      // 4. Get Agendamentos + Colaboradores
+      // 4. Get Colaboradores (Primary Source - Tabela Colaboradores)
+      const { data: colabs } = await supabase
+        .from('colaboradores')
+        .select(`
+            id,
+            nome, 
+            cpf, 
+            setor,
+            cargo,
+            cargos(id, nome)
+        `)
+        .in('unidade', unitIds);
+
+      // 5. Get Agendamentos (Secondary Source - Linked by ID)
       const { data: agendamentos } = await supabase
         .from('agendamentos')
         .select(`
@@ -183,81 +195,72 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
           aso_liberado,
           tipo,
           status,
-          colaborador:colaboradores(
-            id,
-            nome, 
-            cpf, 
-            setor,
-            cargo,
-            cargos(id, nome)
-          ),
+          colaborador_id,
           unidade_info:unidades(nome_unidade)
         `)
         .in('unidade', unitIds)
         .order('data_atendimento', { ascending: false });
 
-      if (!agendamentos) { setLoading(false); return; }
+      if (!colabs) { setLoading(false); return; }
 
-      // 5. Process Data: Group by Collaborator and Calculate Status
+      // 6. Process Data: Map Collaborators first, then attach appointments
       const colabMap = new Map<string, ColaboradorData>();
 
-      agendamentos.forEach((item: any) => {
-          const c = item.colaborador;
-          if (!c) return;
-          
-          if (!colabMap.has(c.id)) {
-              // Determine Periodicity
-              let periodicity = 12; // Default to 12 months if not found
-              
-              if (c.setor && setores && cargoSetorRules) {
-                  const setorObj = setores.find((s: any) => s.nome.toLowerCase() === c.setor.toLowerCase());
-                  if (setorObj) {
-                      // Find rule matching sector ID and cargo ID
-                      const rule = cargoSetorRules.find((r: any) => r.idsetor === setorObj.id && r.idcargo === c.cargos?.id);
-                      if (rule && rule.periodicidade) {
-                          periodicity = rule.periodicidade;
-                      }
+      // Populate Map with ALL collaborators
+      colabs.forEach((c: any) => {
+          // Determine Periodicity based on Sector/Cargo rules
+          let periodicity = 12; // Default to 12 months
+          if (c.setor && setores && cargoSetorRules) {
+              const setorObj = setores.find((s: any) => s.nome.toLowerCase() === c.setor.toLowerCase());
+              if (setorObj) {
+                  const rule = cargoSetorRules.find((r: any) => r.idsetor === setorObj.id && r.idcargo === c.cargos?.id);
+                  if (rule && rule.periodicidade) {
+                      periodicity = rule.periodicidade;
                   }
               }
-
-              colabMap.set(c.id, {
-                  id: c.id,
-                  nome: c.nome,
-                  cpf: c.cpf,
-                  setor: c.setor,
-                  cargo_id: c.cargos?.id,
-                  cargo_nome: c.cargos?.nome || 'N/A',
-                  historico: [],
-                  status_validade: 'pending', // Will calculate after sorting history
-                  periodicidade_meses: periodicity
-              });
           }
 
-          const colabEntry = colabMap.get(c.id)!;
-          
-          colabEntry.historico.push({
-              id: item.id,
-              data_atendimento: item.data_atendimento,
-              aso_url: item.aso_url,
-              aso_liberado: item.aso_liberado,
-              tipo: item.tipo,
-              unidade_info: item.unidade_info,
-              status_agendamento: item.status
+          colabMap.set(c.id, {
+              id: c.id,
+              nome: c.nome,
+              cpf: c.cpf,
+              setor: c.setor,
+              cargo_id: c.cargos?.id,
+              cargo_nome: c.cargos?.nome || 'N/A',
+              historico: [],
+              status_validade: 'pending', 
+              periodicidade_meses: periodicity
           });
       });
 
-      // 6. Finalize Status for each collaborator
+      // Attach Appointments to Collaborators
+      if (agendamentos) {
+          agendamentos.forEach((item: any) => {
+              if (colabMap.has(item.colaborador_id)) {
+                  const colabEntry = colabMap.get(item.colaborador_id)!;
+                  colabEntry.historico.push({
+                      id: item.id,
+                      data_atendimento: item.data_atendimento,
+                      aso_url: item.aso_url,
+                      aso_liberado: item.aso_liberado,
+                      tipo: item.tipo,
+                      unidade_info: item.unidade_info,
+                      status_agendamento: item.status
+                  });
+              }
+          });
+      }
+
+      // 7. Finalize Status for each collaborator
       const processedList: ColaboradorData[] = Array.from(colabMap.values()).map(colab => {
           // Sort history by date desc
-          colab.historico.sort((a, b) => new Date(b.data_atendimento).getTime() - new Date(a.data_atendimento).getTime());
-          
-          // Get latest ASO (prefer released ones, otherwise just latest appointment)
-          // Actually, status depends on the last performed exam date.
-          const lastExam = colab.historico[0]; // Most recent
-          colab.ultimo_aso = lastExam;
+          if (colab.historico.length > 0) {
+              colab.historico.sort((a, b) => new Date(b.data_atendimento).getTime() - new Date(a.data_atendimento).getTime());
+              
+              const lastExam = colab.historico[0];
+              colab.ultimo_aso = lastExam;
 
-          if (lastExam) {
-              // Safe Parse Date YYYY-MM-DD to Local Date Object 00:00:00
+              // Parse Date YYYY-MM-DD
               const [y, m, d] = lastExam.data_atendimento.split('-').map(Number);
               const lastDate = new Date(y, m - 1, d);
               
@@ -275,7 +278,7 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
 
               if (diffDays < 0) {
                   colab.status_validade = 'expired';
-              } else if (diffDays <= 30) { // Alterado de 15 para 30 dias
+              } else if (diffDays <= 30) {
                   colab.status_validade = 'expiring';
               } else {
                   colab.status_validade = 'valid';
@@ -301,7 +304,8 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
     if (url) window.open(url, '_blank');
   };
 
-  const formatCPF = (cpf: string) => {
+  const formatCPF = (cpf: string | null) => {
+    if (!cpf) return '';
     return cpf
       .replace(/\D/g, '')
       .replace(/(\d{3})(\d)/, '$1.$2')
@@ -315,7 +319,6 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
       return date.toLocaleDateString('pt-BR');
   };
 
-  // Safe string formatter to assume YYYY-MM-DD input without timezone conversion
   const formatDateString = (dateStr: string | undefined) => {
       if (!dateStr) return '--/--/----';
       const parts = dateStr.split('-');
@@ -324,16 +327,27 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   };
 
   // Filtering
-  const filteredList = collaborators.filter(c => 
-    c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.cpf.includes(searchTerm)
-  );
+  const filteredList = collaborators.filter(c => {
+    const matchesSearch = c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (c.cpf && c.cpf.includes(searchTerm));
+    const matchesStatus = statusFilter === 'all' || c.status_validade === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const filters = [
+    { id: 'all', label: 'Todos', activeClass: 'bg-[#050a30] text-white border-[#050a30]' },
+    { id: 'valid', label: 'Vigentes', activeClass: 'bg-green-600 text-white border-green-600' },
+    { id: 'expiring', label: 'Vencendo', activeClass: 'bg-yellow-500 text-white border-yellow-500' },
+    { id: 'expired', label: 'Vencidos', activeClass: 'bg-red-600 text-white border-red-600' },
+    { id: 'pending', label: 'Sem Exames', activeClass: 'bg-orange-500 text-white border-orange-500' },
+  ];
 
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Header / Search - Added shrink-0 and min-h to prevent collapsing */}
-      <GlassCard className="p-8 mb-8 shrink-0 min-h-[200px] flex flex-col justify-center">
+      <GlassCard className="p-8 mb-8 shrink-0 min-h-[220px] flex flex-col justify-center">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
            <div>
              <h2 className="text-2xl font-bold text-[#050a30] flex items-center gap-2">
@@ -343,13 +357,31 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
            </div>
         </div>
         
-        <div className="mt-6 w-full">
+        <div className="mt-6 w-full space-y-4">
           <IOSInput 
             value={searchTerm}
             onChange={setSearchTerm}
             placeholder="Buscar colaborador..."
             icon={<Search size={22} />}
           />
+          
+          <div className="flex flex-wrap gap-2 pt-1">
+             {filters.map((f) => (
+                <button
+                   key={f.id}
+                   onClick={() => setStatusFilter(f.id as any)}
+                   className={`
+                      px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border transition-all duration-200
+                      ${statusFilter === f.id 
+                          ? f.activeClass 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-[#050a30] hover:border-gray-300'
+                      }
+                   `}
+                >
+                   {f.label}
+                </button>
+             ))}
+          </div>
         </div>
       </GlassCard>
 
@@ -364,6 +396,11 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
            <GlassCard className="p-12 flex flex-col items-center justify-center min-h-[300px] opacity-60">
               <User size={80} className="mb-6 text-gray-300"/>
               <p className="text-gray-400 text-xl font-medium">Nenhum colaborador encontrado.</p>
+              {statusFilter !== 'all' && (
+                  <button onClick={() => setStatusFilter('all')} className="mt-4 text-[#04a7bd] hover:underline font-medium">
+                      Limpar filtros
+                  </button>
+              )}
           </GlassCard>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-12">
@@ -379,12 +416,12 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                        px-6 py-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center
                        ${colab.status_validade === 'valid' ? 'bg-green-50 text-green-700' : 
                          colab.status_validade === 'expiring' ? 'bg-yellow-50 text-yellow-700' : 
-                         colab.status_validade === 'expired' ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-500'}
+                         colab.status_validade === 'expired' ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-600'}
                     `}>
                         <span className="flex items-center gap-1.5">
                             {colab.status_validade === 'valid' ? <><CheckCircle size={14}/> Vigente</> :
                              colab.status_validade === 'expiring' ? <><Clock size={14}/> Vencendo em {colab.dias_para_vencer} dias</> :
-                             colab.status_validade === 'expired' ? <><AlertTriangle size={14}/> Vencido</> : 'Sem Dados'}
+                             colab.status_validade === 'expired' ? <><AlertTriangle size={14}/> Vencido</> : <><AlertTriangle size={14}/> Sem Exames</>}
                         </span>
                         {colab.data_vencimento && (
                            <span>Vence: {formatDate(colab.data_vencimento)}</span>
@@ -424,12 +461,12 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
 
                     {/* Actions */}
                     <div className="bg-white border-t border-gray-100 p-4 flex items-center gap-3">
-                        {colab.status_validade === 'expired' ? (
+                        {colab.status_validade === 'expired' || colab.status_validade === 'pending' ? (
                             <Button 
                                 onClick={(e) => { e.stopPropagation(); if(onSchedule) onSchedule(colab.id); }}
                                 className="flex-1 h-10 text-xs font-bold !shadow-none rounded-xl flex items-center justify-center gap-2 !bg-orange-500 hover:!bg-orange-600 text-white"
                             >
-                                <CalendarPlus size={16} /> Agendar Renovação
+                                <CalendarPlus size={16} /> {colab.status_validade === 'pending' ? 'Agendar Primeiro Exame' : 'Agendar Renovação'}
                             </Button>
                         ) : (
                             <Button 
