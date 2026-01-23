@@ -39,6 +39,7 @@ interface AgendaItem {
   aso_liberado?: string | null;
   colaborador_id: string;
   unidade: number;
+  exames_snapshot?: string[];
 }
 
 interface AppointmentFormClientProps {
@@ -105,7 +106,7 @@ const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: Or
 
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300 p-4">
-            <GlassCard className="w-full max-w-lg p-0 bg-white border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <GlassCard className="w-full max-w-lg p-0 bg-white border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh] [&>div.relative.z-10]:flex [&>div.relative.z-10]:flex-col [&>div.relative.z-10]:h-full [&>div.relative.z-10]:overflow-hidden">
                 <div className="bg-[#04a7bd] p-6 text-white text-center shrink-0">
                     <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
                         <Info size={32} />
@@ -114,7 +115,7 @@ const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: Or
                     <p className="text-white/90 text-sm mt-1">Orientações e Preparo</p>
                 </div>
                 
-                <div className="p-8 overflow-y-auto custom-scrollbar text-[#050a30] text-sm leading-relaxed space-y-6">
+                <div className="p-8 overflow-y-auto custom-scrollbar text-[#050a30] text-sm leading-relaxed space-y-6 flex-1">
                     <div>
                         <p>
                             Exame Ocupacional do(a) paciente <strong className="text-lg">{data.patientName}</strong> está agendado para <strong className="text-lg">{formatDateFull(data.date)}</strong>, <strong className="text-lg">às 7:00</strong>.
@@ -474,6 +475,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
             tipo,
             compareceu,
             aso_liberado,
+            exames_snapshot,
             colaborador:colaboradores(nome),
             unidade_info:unidades(nome_unidade),
             colaborador_id,
@@ -661,11 +663,25 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       if (unitSectorLink) {
           const { data: examsData } = await supabase
             .from('exames_unidade')
-            .select('exames(nome)')
+            .select('admissao, demissao, ret_trabalho, mud_riscos, periodicidade, exames(nome)')
             .eq('unidade_setor', unitSectorLink.id);
           
           if (examsData) {
-              examsList = examsData.map((item: any) => item.exames?.nome).filter(Boolean);
+              const currentType = appointmentData.tipo;
+              const filteredExams = examsData.filter((item: any) => {
+                  if (currentType === 'Admissional') return item.admissao === true;
+                  if (currentType === 'Demissional') return item.demissao === true;
+                  // Periódico logic: usually defined by existence of periodicidade or explicit flag. 
+                  // Based on schema, periodicidade is numeric. If > 0, it applies.
+                  if (currentType === 'Periódico') return item.periodicidade && Number(item.periodicidade) > 0;
+                  // Value in select is 'Retorno'
+                  if (currentType === 'Retorno') return item.ret_trabalho === true;
+                  // Value in select is 'Mudança'
+                  if (currentType === 'Mudança') return item.mud_riscos === true;
+                  return false;
+              });
+
+              examsList = filteredExams.map((item: any) => item.exames?.nome).filter(Boolean);
           }
       }
 
@@ -715,6 +731,17 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       setMessage({ type: 'success', text: 'Agendamento realizado com sucesso!' });
       fetchAgenda(unidades.map(u => u.id)); 
       backToSearch(); 
+  };
+
+  const handleOpenOrientationFromAgenda = (item: AgendaItem) => {
+      setOrientationModal({
+          isOpen: true,
+          data: {
+              patientName: item.colaborador?.nome || 'Paciente',
+              date: item.data_atendimento,
+              exams: item.exames_snapshot || []
+          }
+      });
   };
 
   const filteredColabs = colaboradores.filter(c => 
@@ -834,19 +861,19 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                         <div className="flex flex-col items-center justify-center h-64 opacity-50"><Calendar size={48} className="mb-4 text-gray-300"/><p className="text-gray-400">Nenhum exame agendado recentemente.</p></div>
                     ) : (
                         agenda.map((item) => (
-                           <div key={item.id} className="bg-white border border-gray-100 p-4 rounded-xl flex items-center justify-between hover:shadow-md transition-all hover:border-[#04a7bd]/30">
+                           <div key={item.id} onClick={() => handleOpenOrientationFromAgenda(item)} className="bg-white border border-gray-100 p-4 rounded-xl flex items-center justify-between hover:shadow-md transition-all hover:border-[#04a7bd]/30 cursor-pointer group">
                                 <div className="flex items-center gap-4">
                                     <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg w-14 h-14 border border-gray-200">
                                         <span className="text-[10px] text-gray-500 uppercase font-bold">{new Date(item.data_atendimento).toLocaleDateString('pt-BR', { month: 'short' }).replace('.','')}</span>
                                         <span className="text-xl font-bold text-[#050a30]">{item.data_atendimento.split('-')[2]}</span>
                                     </div>
                                     <div>
-                                        <h4 className="text-lg font-bold text-[#050a30]">{item.colaborador?.nome}</h4>
+                                        <h4 className="text-lg font-bold text-[#050a30] group-hover:text-[#04a7bd] transition-colors">{item.colaborador?.nome}</h4>
                                         <div className="flex gap-2 mt-1"><span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{item.tipo}</span><span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{item.unidade_info?.nome_unidade}</span></div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {item.aso_liberado ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">ASO Liberado</span> : <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-bold">Agendado</span>}
+                                    {item.aso_liberado ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">ASO Liberado</span> : <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">Agendado <Info size={12} /></span>}
                                 </div>
                            </div>
                         ))
