@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button, Input } from './ui/GlassComponents';
-import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, AlertCircle, Clock, CheckCircle, XCircle, Filter, ArrowRight, Edit3, Save, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, AlertCircle, Clock, CheckCircle, XCircle, Filter, ArrowRight, Edit3, Save, AlertTriangle, Info, Map, Copy } from 'lucide-react';
 
 // --- Types ---
 
@@ -38,13 +38,146 @@ interface AgendaItem {
   unidade_info: { nome_unidade: string };
   compareceu: boolean;
   aso_liberado?: string | null; // Date string or null
+  colaborador_id: string; // Added for click handler
+  unidade: number; // Added for click handler
 }
 
 interface AppointmentFormClientProps {
     preSelectedColabId?: string | null;
 }
 
+interface OrientationData {
+    patientName: string;
+    date: string;
+    exams: string[];
+}
+
 // --- Helper Components (iOS Style) ---
+
+const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: OrientationData | null, onClose: () => void }) => {
+    const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) setCopied(false);
+    }, [isOpen]);
+
+    if (!isOpen || !data) return null;
+
+    const formatDateFull = (dateString: string) => {
+        if (!dateString) return '-';
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+          return `${parts[2]}/${parts[1]}/${parts[0]}`; 
+        }
+        return dateString;
+    };
+
+    const hasAudiometria = data.exams.some(ex => ex.toLowerCase().includes('audiometria'));
+    const hasGlicemia = data.exams.some(ex => ex.toLowerCase().includes('glicemia') || ex.toLowerCase().includes('hemoglobina glicada'));
+
+    const handleCopy = () => {
+        let text = `Exame Ocupacional do(a) paciente ${data.patientName} está agendado para ${formatDateFull(data.date)}, às 7:00.\n`;
+        text += `Atendimento por ordem de chegada!\n\n`;
+        
+        if (data.exams.length > 0) {
+            text += `Exames Solicitados:\n`;
+            data.exams.forEach(ex => {
+                text += `${ex}\n`;
+            });
+            text += `\n`;
+        }
+
+        text += `Orientações dos exames ocupacionais:\n`;
+        text += `Levar RG e CPF!\n`;
+        
+        if (hasAudiometria) {
+            text += `Fazer repouso auditivo de 12 horas.\n`;
+        }
+        if (hasGlicemia) {
+            text += `Jejum de 8 horas.\n`;
+        }
+
+        text += `\nEndereço da Clínica Gama Center: Rua Barão de Pouso Alegre, 90, São Sebastião, Conselheiro Lafaiete (ao lado da Igreja São Sebastião).`;
+
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300 p-4">
+            <GlassCard className="w-full max-w-lg p-0 bg-white border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="bg-[#04a7bd] p-6 text-white text-center shrink-0">
+                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                        <Info size={32} />
+                    </div>
+                    <h3 className="text-2xl font-bold">Detalhes do Agendamento</h3>
+                    <p className="text-white/90 text-sm mt-1">Orientações e Preparo</p>
+                </div>
+                
+                <div className="p-8 overflow-y-auto custom-scrollbar text-[#050a30] text-sm leading-relaxed space-y-6">
+                    <div>
+                        <p>
+                            Exame Ocupacional do(a) paciente <strong className="text-lg">{data.patientName}</strong> está agendado para <strong className="text-lg">{formatDateFull(data.date)}</strong>, <strong className="text-lg">às 7:00</strong>.
+                        </p>
+                        <p className="italic text-gray-500 mt-1 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100 inline-block">
+                            Atendimento por ordem de chegada!
+                        </p>
+                    </div>
+
+                    {data.exams.length > 0 && (
+                        <div>
+                            <h4 className="font-bold text-[#04a7bd] uppercase text-xs tracking-wider mb-2 border-b border-gray-100 pb-1">Exames Solicitados</h4>
+                            <ul className="list-disc pl-5 space-y-1 text-gray-700 font-medium">
+                                {data.exams.map((ex, i) => (
+                                    <li key={i}>{ex}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    <div>
+                        <h4 className="font-bold text-[#04a7bd] uppercase text-xs tracking-wider mb-2 border-b border-gray-100 pb-1">Orientações dos exames ocupacionais</h4>
+                        <ul className="space-y-2">
+                            <li className="flex items-start gap-2">
+                                <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
+                                <span>Levar RG e CPF!</span>
+                            </li>
+                            {hasAudiometria && (
+                                <li className="flex items-start gap-2">
+                                    <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
+                                    <span>Fazer repouso auditivo de 12 horas.</span>
+                                </li>
+                            )}
+                            {hasGlicemia && (
+                                <li className="flex items-start gap-2">
+                                    <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
+                                    <span>Jejum de 8 horas.</span>
+                                </li>
+                            )}
+                        </ul>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 mb-2 font-bold text-[#050a30]">
+                            <MapPin size={16} className="text-[#04a7bd]" /> Endereço da Clínica Gama Center
+                        </div>
+                        <p>Rua Barão de Pouso Alegre, 90, São Sebastião, Conselheiro Lafaiete (ao lado da Igreja São Sebastião).</p>
+                    </div>
+                </div>
+
+                <div className="p-6 border-t border-gray-100 bg-gray-50 shrink-0 flex gap-3">
+                    <Button onClick={handleCopy} className={`flex-1 h-12 text-base font-bold shadow-md transition-all ${copied ? '!bg-green-600 hover:!bg-green-700 !text-white' : '!bg-blue-50 !text-blue-700 border border-blue-200 hover:!bg-blue-100 hover:border-blue-300'}`}>
+                        {copied ? <><CheckCircle size={20}/> Copiado!</> : <><Copy size={20}/> Copiar Texto</>}
+                    </Button>
+                    <Button onClick={onClose} className="flex-1 h-12 text-base font-bold shadow-lg">
+                        Entendido
+                    </Button>
+                </div>
+            </GlassCard>
+        </div>
+    );
+};
 
 const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText = "Confirmar", isWarning = false }: any) => {
   if (!isOpen) return null;
@@ -232,6 +365,12 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
+  // Orientation Modal State
+  const [orientationModal, setOrientationModal] = useState<{
+      isOpen: boolean;
+      data: OrientationData | null;
+  }>({ isOpen: false, data: null });
+
   // Data Lists
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
@@ -353,7 +492,9 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
             compareceu,
             aso_liberado,
             colaborador:colaboradores(nome),
-            unidade_info:unidades(nome_unidade)
+            unidade_info:unidades(nome_unidade),
+            colaborador_id,
+            unidade
           `)
           .in('unidade', unitIds)
           .order('data_atendimento', { ascending: false })
@@ -605,7 +746,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     });
   };
 
-  // 3. Final Execution
+  // 3. Final Execution & Orientation Trigger
   const executeSaving = async (targetColabId: string) => {
     setLoading(true);
     try {
@@ -643,7 +784,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         nome: colabFormData.nome,
         dataExame: appointmentData.data_atendimento,
         funcao: colabFormData.funcao,
-        cpf: cleanCPF, // PDF also gets clean CPF or masked? Usually docs want masked, but let's stick to simple
+        cpf: cleanCPF, 
         dataNascimento: colabFormData.data_nascimento,
         sexo: colabFormData.sexo,
         tipoExame: appointmentData.tipo,
@@ -670,16 +811,57 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
 
       if (error) throw error;
 
-      setMessage({ type: 'success', text: 'Agendamento realizado com sucesso!' });
+      // --- FETCH EXAMS FOR ORIENTATION MODAL ---
+      console.log("LOG: Iniciando busca de exames para orientações...");
+      console.log("LOG: Unidade ID:", appointmentData.unidadeId);
+      console.log("LOG: Setor ID (Genérico da tabela setor):", colabFormData.setorId);
+
+      // 1. Get the link ID from unidade_setor
+      const { data: unitSectorLink, error: linkError } = await supabase
+        .from('unidade_setor')
+        .select('id')
+        .eq('unidade', appointmentData.unidadeId)
+        .eq('setor', Number(colabFormData.setorId)) // setorId is generic ID, we need the link ID
+        .maybeSingle();
+
+      if (linkError) console.error("LOG: Erro buscando unidade_setor:", linkError);
+      console.log("LOG: Vínculo unidade_setor encontrado:", unitSectorLink);
+
+      let examsList: string[] = [];
       
-      // Reset flow
-      fetchAgenda(unidades.map(u => u.id)); // Refresh agenda
-      backToSearch(); // Go back to search
-      
-      // Background refresh colabs
-      const { data: colabs } = await supabase.from('colaboradores').select('id, nome, cpf, data_nascimento, sexo, setor, setorid, cargo, cargos(nome), unidade').in('unidade', unidades.map(u => u.id));
-      // @ts-ignore
-      if (colabs) setColaboradores(colabs);
+      if (unitSectorLink) {
+          // 2. Fetch linked exams using the specific unit_sector ID
+          console.log("LOG: Buscando exames na tabela exames_unidade com unidade_setor ID:", unitSectorLink.id);
+          
+          const { data: examsData, error: examsError } = await supabase
+            .from('exames_unidade')
+            .select('exames(nome)') // Join to get name
+            .eq('unidade_setor', unitSectorLink.id);
+          
+          if (examsError) console.error("LOG: Erro buscando exames_unidade:", examsError);
+          console.log("LOG: Dados brutos retornados de exames_unidade:", examsData);
+
+          if (examsData) {
+              examsList = examsData.map((item: any) => item.exames?.nome).filter(Boolean);
+          }
+      } else {
+          console.log("LOG: Nenhum vínculo de setor encontrado para esta unidade e setor genérico.");
+      }
+
+      console.log("LOG: Lista final de exames para o modal:", examsList);
+
+      // Open Orientation Modal
+      setOrientationModal({
+          isOpen: true,
+          data: {
+              patientName: colabFormData.nome,
+              date: appointmentData.data_atendimento,
+              exams: examsList
+          }
+      });
+
+      // Note: We do NOT reset state here anymore. 
+      // State reset happens on handleOrientationClose
 
     } catch (err: any) {
       console.error(err);
@@ -687,6 +869,83 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOrientationClose = async () => {
+      setOrientationModal({ isOpen: false, data: null });
+      setMessage({ type: 'success', text: 'Agendamento realizado com sucesso!' });
+      
+      // Reset flow (previously done in executeSaving)
+      fetchAgenda(unidades.map(u => u.id)); 
+      backToSearch(); 
+      
+      // Background refresh colabs
+      const { data: colabs } = await supabase.from('colaboradores').select('id, nome, cpf, data_nascimento, sexo, setor, setorid, cargo, cargos(nome), unidade').in('unidade', unidades.map(u => u.id));
+      // @ts-ignore
+      if (colabs) setColaboradores(colabs);
+  };
+
+  const handleAgendaItemClick = async (item: AgendaItem) => {
+      // Use existing fetch logic to show details for existing appointment
+      setLoading(true);
+      try {
+          const { data: colab } = await supabase.from('colaboradores').select('*').eq('id', item.colaborador_id).single();
+          
+          if (!colab) throw new Error("Colaborador não encontrado");
+
+          // Need sector ID (generic) and Unit ID
+          const unitId = item.unidade || colab.unidade;
+          const sectorId = colab.setorid;
+
+          if (!unitId || !sectorId) {
+              // Fallback if data is missing, just show basic info
+              setOrientationModal({
+                  isOpen: true,
+                  data: {
+                      patientName: item.colaborador.nome,
+                      date: item.data_atendimento,
+                      exams: []
+                  }
+              });
+              setLoading(false);
+              return;
+          }
+
+          // Fetch Exams logic (Reused)
+          const { data: unitSectorLink } = await supabase
+            .from('unidade_setor')
+            .select('id')
+            .eq('unidade', unitId)
+            .eq('setor', sectorId)
+            .maybeSingle();
+
+          let examsList: string[] = [];
+          
+          if (unitSectorLink) {
+              const { data: examsData } = await supabase
+                .from('exames_unidade')
+                .select('exames(nome)')
+                .eq('unidade_setor', unitSectorLink.id);
+              
+              if (examsData) {
+                  examsList = examsData.map((exItem: any) => exItem.exames?.nome).filter(Boolean);
+              }
+          }
+
+          setOrientationModal({
+              isOpen: true,
+              data: {
+                  patientName: item.colaborador.nome,
+                  date: item.data_atendimento,
+                  exams: examsList
+              }
+          });
+
+      } catch (err) {
+          console.error("Erro ao buscar detalhes:", err);
+      } finally {
+          setLoading(false);
+      }
   };
 
   // Filters
@@ -746,6 +1005,12 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
           isWarning={modalConfig.isWarning}
           onConfirm={modalConfig.onConfirm}
           onCancel={() => setModalConfig(prev => ({...prev, isOpen: false}))}
+        />
+
+        <OrientationModal 
+            isOpen={orientationModal.isOpen}
+            data={orientationModal.data}
+            onClose={handleOrientationClose}
         />
 
         {/* LEFT COLUMN: FORM (Increased Width) */}
@@ -984,7 +1249,11 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                               </div>
                               <div className="space-y-3">
                                  {group.items.map((item) => (
-                                    <div key={item.id} className="group bg-white border border-gray-100 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between hover:shadow-md transition-all hover:border-[#04a7bd]/30">
+                                    <div 
+                                      key={item.id} 
+                                      onClick={() => handleAgendaItemClick(item)}
+                                      className="group bg-white border border-gray-100 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between hover:shadow-md transition-all hover:border-[#04a7bd]/30 cursor-pointer"
+                                    >
                                         <div className="flex items-start gap-4 mb-3 md:mb-0">
                                             <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg w-16 h-16 border border-gray-200 group-hover:border-[#04a7bd]/30 transition-colors">
                                                 <span className="text-xs text-gray-500 uppercase font-bold">{new Date(item.data_atendimento).toLocaleDateString('pt-BR', { month: 'short' }).replace('.','')}</span>
