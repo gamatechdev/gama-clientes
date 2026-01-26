@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
-import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus, Filter } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus, Filter, ClipboardList, Eye, FileCheck } from 'lucide-react';
 
 // --- Interfaces ---
 
@@ -14,6 +13,8 @@ interface AsoItem {
   tipo: string;
   unidade_info: { nome_unidade: string };
   status_agendamento: string; // 'pendente', 'concluido', etc from agendamentos table
+  has_prontuario?: boolean;
+  has_esoc?: boolean;
 }
 
 interface ColaboradorData {
@@ -29,6 +30,20 @@ interface ColaboradorData {
   dias_para_vencer?: number;
   data_vencimento?: Date;
   periodicidade_meses: number;
+}
+
+interface ProntuarioItem {
+    id: number;
+    created_at: string;
+    tipo: string;
+    url: string;
+}
+
+interface ESocItem {
+    id: number;
+    created_at: string;
+    evento: string;
+    url: string;
 }
 
 interface ASOListClientProps {
@@ -140,14 +155,195 @@ const HistoryModal = ({ isOpen, colaborador, onClose }: { isOpen: boolean, colab
     );
 };
 
+const ProntuarioModal = ({ isOpen, agendamentoId, patientName, onClose }: { isOpen: boolean, agendamentoId: number, patientName: string, onClose: () => void }) => {
+    const [records, setRecords] = useState<ProntuarioItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (isOpen && agendamentoId) {
+            fetchRecords();
+        } else {
+            setRecords([]);
+        }
+    }, [isOpen, agendamentoId]);
+
+    const fetchRecords = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('prontuarios_agendamentos')
+                .select('*')
+                .eq('agendamento_id', agendamentoId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setRecords(data || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+            <GlassCard className="w-full max-w-lg bg-white border-none shadow-2xl flex flex-col max-h-[85vh] p-0 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                            <ClipboardList size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-[#050a30]">Prontuários Médicos</h3>
+                            <p className="text-xs text-gray-500">Paciente: {patientName}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
+                    {loading ? (
+                        <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-600"></div>
+                        </div>
+                    ) : records.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400">
+                            <ClipboardList size={40} className="mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">Nenhum prontuário anexado a este atendimento.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {records.map((rec) => (
+                                <div key={rec.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between hover:border-purple-200 transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                                            <FileText size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-[#050a30]">{rec.tipo || 'Documento Médico'}</p>
+                                            <p className="text-[10px] text-gray-400">{new Date(rec.created_at).toLocaleDateString('pt-BR')} às {new Date(rec.created_at).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</p>
+                                        </div>
+                                    </div>
+                                    <Button 
+                                        onClick={() => window.open(rec.url, '_blank')} 
+                                        className="h-9 px-3 text-xs font-bold !bg-purple-600 hover:!bg-purple-700 !shadow-none text-white gap-2"
+                                    >
+                                        <Eye size={14} /> Visualizar
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </GlassCard>
+        </div>
+    );
+};
+
+const ESocModal = ({ isOpen, agendamentoId, patientName, onClose }: { isOpen: boolean, agendamentoId: number, patientName: string, onClose: () => void }) => {
+    const [events, setEvents] = useState<ESocItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (isOpen && agendamentoId) {
+            fetchEvents();
+        } else {
+            setEvents([]);
+        }
+    }, [isOpen, agendamentoId]);
+
+    const fetchEvents = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('esoc_agendamentos')
+                .select('*')
+                .eq('agendamento_id', agendamentoId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setEvents(data || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+            <GlassCard className="w-full max-w-lg bg-white border-none shadow-2xl flex flex-col max-h-[85vh] p-0 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <FileCheck size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-[#050a30]">Eventos eSocial</h3>
+                            <p className="text-xs text-gray-500">Colaborador: {patientName}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
+                    {loading ? (
+                        <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : events.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400">
+                            <FileCheck size={40} className="mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">Nenhum evento do eSocial encontrado para este exame.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {events.map((evt) => (
+                                <div key={evt.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                            <FileText size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-[#050a30]">{evt.evento || 'Evento S-2220'}</p>
+                                            <p className="text-[10px] text-gray-400">Gerado em: {new Date(evt.created_at).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                    </div>
+                                    <Button 
+                                        onClick={() => window.open(evt.url, '_blank')} 
+                                        className="h-9 px-3 text-xs font-bold !bg-blue-600 hover:!bg-blue-700 !shadow-none text-white gap-2"
+                                    >
+                                        <Download size={14} /> XML/PDF
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </GlassCard>
+        </div>
+    );
+};
+
 export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const [loading, setLoading] = useState(true);
   const [collaborators, setCollaborators] = useState<ColaboradorData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'valid' | 'expiring' | 'expired' | 'pending'>('all');
+  const [clientConfig, setClientConfig] = useState({ envia_prontuario: false, envia_esoc: false });
   
   // Modal State
   const [selectedColab, setSelectedColab] = useState<ColaboradorData | null>(null);
+  const [prontuarioModal, setProntuarioModal] = useState<{ isOpen: boolean, agendamentoId: number, patientName: string }>({ isOpen: false, agendamentoId: 0, patientName: '' });
+  const [esocModal, setEsocModal] = useState<{ isOpen: boolean, agendamentoId: number, patientName: string }>({ isOpen: false, agendamentoId: 0, patientName: '' });
 
   useEffect(() => {
     fetchData();
@@ -159,9 +355,28 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Get Client ID
-      const { data: userProfile } = await supabase.from('users').select('cliente_id').eq('user_id', user.id).single();
+      // 1. Get Client ID and Config
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select(`
+            cliente_id,
+            clientes (
+                envia_prontuario,
+                envia_esoc
+            )
+        `)
+        .eq('user_id', user.id)
+        .single();
+
       if (!userProfile?.cliente_id) return;
+
+      // Set Client Config
+      // @ts-ignore
+      const config = userProfile.clientes;
+      setClientConfig({ 
+          envia_prontuario: config?.envia_prontuario === true,
+          envia_esoc: config?.envia_esoc === true
+      });
 
       // 2. Get Units
       const { data: units } = await supabase.from('unidades').select('id').eq('empresaid', userProfile.cliente_id);
@@ -186,7 +401,8 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
         .in('unidade', unitIds);
 
       // 5. Get Agendamentos (Secondary Source - Linked by ID)
-      const { data: agendamentos } = await supabase
+      // Including both counts for logic
+      const { data: agendamentos, error: agError } = await supabase
         .from('agendamentos')
         .select(`
           id,
@@ -196,10 +412,14 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
           tipo,
           status,
           colaborador_id,
-          unidade_info:unidades(nome_unidade)
+          unidade_info:unidades(nome_unidade),
+          prontuarios:prontuarios_agendamentos!prontuarios_agendamentos_agendamento_id_fkey(id),
+          esoc:esoc_agendamentos!esoc_agendamentos_agendamento_id_fkey(id)
         `)
         .in('unidade', unitIds)
         .order('data_atendimento', { ascending: false });
+
+      if (agError) console.error("Error fetching agendamentos:", agError);
 
       if (!colabs) { setLoading(false); return; }
 
@@ -236,6 +456,9 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
       // Attach Appointments to Collaborators
       if (agendamentos) {
           agendamentos.forEach((item: any) => {
+              const hasProntuario = item.prontuarios && item.prontuarios.length > 0;
+              const hasEsoc = item.esoc && item.esoc.length > 0;
+              
               if (colabMap.has(item.colaborador_id)) {
                   const colabEntry = colabMap.get(item.colaborador_id)!;
                   colabEntry.historico.push({
@@ -245,7 +468,9 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                       aso_liberado: item.aso_liberado,
                       tipo: item.tipo,
                       unidade_info: item.unidade_info,
-                      status_agendamento: item.status
+                      status_agendamento: item.status,
+                      has_prontuario: hasProntuario,
+                      has_esoc: hasEsoc
                   });
               }
           });
@@ -302,6 +527,16 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const handleDownload = (e: React.MouseEvent, url: string | null) => {
     e.stopPropagation();
     if (url) window.open(url, '_blank');
+  };
+
+  const handleOpenProntuario = (e: React.MouseEvent, agendamentoId: number, name: string) => {
+      e.stopPropagation();
+      setProntuarioModal({ isOpen: true, agendamentoId, patientName: name });
+  };
+
+  const handleOpenESoc = (e: React.MouseEvent, agendamentoId: number, name: string) => {
+      e.stopPropagation();
+      setEsocModal({ isOpen: true, agendamentoId, patientName: name });
   };
 
   const formatCPF = (cpf: string | null) => {
@@ -460,13 +695,13 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                     </div>
 
                     {/* Actions */}
-                    <div className="bg-white border-t border-gray-100 p-4 flex items-center gap-3">
+                    <div className="bg-white border-t border-gray-100 p-4 flex items-center gap-2">
                         {colab.status_validade === 'expired' || colab.status_validade === 'pending' ? (
                             <Button 
                                 onClick={(e) => { e.stopPropagation(); if(onSchedule) onSchedule(colab.id); }}
                                 className="flex-1 h-10 text-xs font-bold !shadow-none rounded-xl flex items-center justify-center gap-2 !bg-orange-500 hover:!bg-orange-600 text-white"
                             >
-                                <CalendarPlus size={16} /> {colab.status_validade === 'pending' ? 'Agendar Primeiro Exame' : 'Agendar Renovação'}
+                                <CalendarPlus size={16} /> {colab.status_validade === 'pending' ? 'Agendar' : 'Renovar'}
                             </Button>
                         ) : (
                             <Button 
@@ -474,11 +709,31 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                                 disabled={!colab.ultimo_aso?.aso_url}
                                 className={`flex-1 h-10 text-xs font-bold !shadow-none rounded-xl flex items-center justify-center gap-2 ${!colab.ultimo_aso?.aso_url ? '!bg-gray-100 !text-gray-400' : '!bg-[#04a7bd] hover:!bg-[#038e9e]'}`}
                             >
-                                <Download size={16} /> {colab.ultimo_aso?.aso_url ? 'Baixar Último ASO' : 'ASO Indisponível'}
+                                <Download size={16} /> ASO
+                            </Button>
+                        )}
+
+                        {clientConfig.envia_prontuario && colab.ultimo_aso && (
+                            <Button
+                                onClick={(e) => handleOpenProntuario(e, colab.ultimo_aso!.id, colab.nome)}
+                                disabled={!colab.ultimo_aso.has_prontuario}
+                                className={`flex-1 h-10 text-xs font-bold !shadow-none rounded-xl flex items-center justify-center gap-2 ${!colab.ultimo_aso.has_prontuario ? '!bg-gray-100 !text-gray-400 cursor-not-allowed' : '!bg-purple-600 hover:!bg-purple-700 text-white'}`}
+                            >
+                                <ClipboardList size={16} /> Prontuário
+                            </Button>
+                        )}
+
+                        {clientConfig.envia_esoc && colab.ultimo_aso && (
+                            <Button
+                                onClick={(e) => handleOpenESoc(e, colab.ultimo_aso!.id, colab.nome)}
+                                disabled={!colab.ultimo_aso.has_esoc}
+                                className={`flex-1 h-10 text-xs font-bold !shadow-none rounded-xl flex items-center justify-center gap-2 ${!colab.ultimo_aso.has_esoc ? '!bg-gray-100 !text-gray-400 cursor-not-allowed' : '!bg-blue-800 hover:!bg-blue-900 text-white'}`}
+                            >
+                                <FileCheck size={16} /> eSocial
                             </Button>
                         )}
                         
-                        <button className="w-10 h-10 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors">
+                        <button className="w-10 h-10 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors shrink-0">
                            <ChevronRight size={20} />
                         </button>
                     </div>
@@ -492,6 +747,20 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
         isOpen={!!selectedColab} 
         colaborador={selectedColab} 
         onClose={() => setSelectedColab(null)} 
+      />
+
+      <ProntuarioModal 
+        isOpen={prontuarioModal.isOpen} 
+        agendamentoId={prontuarioModal.agendamentoId}
+        patientName={prontuarioModal.patientName}
+        onClose={() => setProntuarioModal(prev => ({ ...prev, isOpen: false }))} 
+      />
+
+      <ESocModal 
+        isOpen={esocModal.isOpen} 
+        agendamentoId={esocModal.agendamentoId}
+        patientName={esocModal.patientName}
+        onClose={() => setEsocModal(prev => ({ ...prev, isOpen: false }))} 
       />
 
     </div>
