@@ -372,7 +372,9 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
 
       // Set Client Config
       // @ts-ignore
-      const config = userProfile.clientes;
+      const rawConfig = userProfile.clientes;
+      const config = Array.isArray(rawConfig) ? rawConfig[0] : rawConfig;
+
       setClientConfig({ 
           envia_prontuario: config?.envia_prontuario === true,
           envia_esoc: config?.envia_esoc === true
