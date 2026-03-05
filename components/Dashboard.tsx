@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Session } from '@supabase/supabase-js';
 import { GlassCard, Button, Input, PageTitle } from './ui/GlassComponents';
 import { Cliente, Unidade, Setor, Cargo, LinkedCargo, LinkedSetor, HierarchyUnit, Exame, UserProfile } from '../types';
-import { Building2, MapPin, Plus, ArrowLeft, Search, LogOut, Briefcase, Layers, Link as LinkIcon, UserCog, Trash2, Network, X, Edit2, AlertTriangle, ChevronDown, Activity, Save, FileText, FolderOpen, Download, ExternalLink, Calendar, CheckCircle, Clock, UploadCloud, Link, UserPlus, Mail, Lock, Camera, LayoutDashboard, PieChart, Users, Menu, ChevronRight, BarChart3, TrendingUp, AlertCircle, ArrowUpRight, Move, User, History, Printer, ShieldAlert, Check, Stethoscope, ArrowRight, Copy, ZoomIn, ZoomOut, Maximize, ChevronsLeft, ChevronsRight, Upload } from 'lucide-react';
+import { Building2, MapPin, Plus, ArrowLeft, ChevronLeft, Search, LogOut, Briefcase, Layers, Link as LinkIcon, UserCog, Trash2, Network, X, Edit2, AlertTriangle, ChevronDown, Activity, Save, FileText, FolderOpen, Download, ExternalLink, Calendar, CheckCircle, Clock, UploadCloud, Link, UserPlus, Mail, Lock, Camera, LayoutDashboard, PieChart, Users, Menu, ChevronRight, BarChart3, TrendingUp, AlertCircle, ArrowUpRight, Move, User, History, Printer, ShieldAlert, Check, Stethoscope, ArrowRight, Copy, ZoomIn, ZoomOut, Maximize, ChevronsLeft, ChevronsRight, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface DashboardProps {
@@ -86,23 +86,53 @@ const ActionButton = memo(({ onClick, icon: Icon, colorClass, title }: any) => (
   </button>
 ));
 
-const TreeCard = memo(({ icon: Icon, title, subtitle, colorClass, bgColorClass, actions, extraInfo }: any) => (
+const mapAnimations = `
+  @keyframes nodeFadeIn {
+    from { opacity: 0; transform: translateX(-10px) scale(0.95); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes lineExpand {
+    from { width: 0; opacity: 0; }
+    to { width: 3rem; opacity: 1; }
+  }
+  @keyframes branchExpand {
+    from { height: 0; opacity: 0; }
+    to { height: 100%; opacity: 1; }
+  }
+  .animate-node { animation: nodeFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .animate-line { animation: lineExpand 0.3s ease-out forwards; }
+  .animate-branch { animation: branchExpand 0.4s ease-out forwards; }
+  .glass-node {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  }
+  .glass-node-active {
+    background: #050a30;
+    box-shadow: 0 8px 25px rgba(5, 10, 48, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+`;
+
+const TreeCard = memo(({ icon: Icon, title, subtitle, colorClass, bgColorClass, actions, extraInfo, isActive }: any) => (
   <div
     onMouseDown={(e) => e.stopPropagation()}
-    className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm min-w-[300px] hover:shadow-md transition-shadow relative group z-10 select-none"
+    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 min-w-[320px] relative group z-10 select-none animate-node ${isActive ? 'glass-node-active scale-105' : 'glass-node hover:shadow-xl hover:-translate-y-1 hover:border-[#04a7bd]/30'}`}
   >
-    <div className={`p-3 rounded-xl flex items-center justify-center shrink-0 ${bgColorClass} ${colorClass}`}>
+    <style>{mapAnimations}</style>
+    <div className={`p-3 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300 ${isActive ? 'bg-white/10 text-white' : `${bgColorClass} ${colorClass}`}`}>
       <Icon size={24} />
     </div>
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2">
-        <h4 className={`text-base font-bold truncate ${colorClass}`}>{title}</h4>
+        <h4 className={`text-base font-bold truncate transition-colors duration-300 ${isActive ? 'text-white' : colorClass}`}>{title}</h4>
         {extraInfo}
       </div>
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{subtitle}</p>
+      <p className={`text-[10px] font-medium uppercase tracking-wider transition-colors duration-300 ${isActive ? 'text-white/60' : 'text-gray-400'}`}>{subtitle}</p>
     </div>
     {actions && (
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 bg-white/90 backdrop-blur-sm p-1 rounded-full shadow-sm border border-gray-100">
+      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
         {actions}
       </div>
     )}
@@ -224,37 +254,42 @@ interface SectorNodeProps {
   onTriggerDeleteSectorLink: (linkId: number) => void;
   sIdx: number;
   totalSectors: number;
+  isSelected: boolean;
+  onSelect: (sectorId: number | null, element?: HTMLElement) => void;
 }
 
-const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, sIdx, totalSectors }: SectorNodeProps) => (
+const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, sIdx, totalSectors, isSelected, onSelect }: SectorNodeProps) => (
   <div className="flex items-center relative">
     <div className="w-8 h-[2px] bg-gray-300 shrink-0 relative">
       {sIdx === 0 && totalSectors > 1 && <div className="absolute left-0 top-0 bottom-[-50%] w-[2px] bg-gray-300"></div>}
       {sIdx === totalSectors - 1 && totalSectors > 1 && <div className="absolute left-0 bottom-0 top-[-50%] w-[2px] bg-gray-300"></div>}
     </div>
-    <TreeCard
-      icon={Layers}
-      title={sector.setor.nome}
-      subtitle="Setor"
-      colorClass="text-[#050a30]"
-      bgColorClass="bg-[#050a30]/10"
-      actions={
-        <>
-          <ActionButton icon={Plus} colorClass="text-[#050a30] hover:text-white hover:bg-[#050a30]" title="Novo Cargo" onClick={() => onTriggerAddCargoSafe(sector.setor.id)} />
-          <ActionButton icon={Stethoscope} colorClass="text-blue-600 hover:text-white hover:bg-blue-600" title="Gerenciar Exames Específicos" onClick={() => onHandleManageExams(sector)} />
-          <ActionButton icon={ShieldAlert} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Riscos do Setor" onClick={() => onHandleManageRisks(sector)} />
-          <ActionButton icon={Activity} colorClass="text-pink-500 hover:text-white hover:bg-pink-500" title="Exames do Setor" onClick={() => onTriggerPeriodicitySector(sector.setor)} />
-          <ActionButton icon={Edit2} colorClass="text-amber-500 hover:text-white hover:bg-amber-500" title="Renomear" onClick={() => onTriggerEditSector(sector.setor)} />
-          <ActionButton icon={Trash2} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Apagar" onClick={() => onTriggerDeleteSectorLink(sector.id)} />
-        </>
-      }
-    />
+    <div onClick={(e) => onSelect(isSelected ? null : sector.id, e.currentTarget)} className="cursor-pointer">
+      <TreeCard
+        icon={Layers}
+        title={sector.setor.nome}
+        subtitle="Setor"
+        isActive={isSelected}
+        colorClass="text-[#050a30]"
+        bgColorClass="bg-[#050a30]/10"
+        actions={
+          <>
+            <ActionButton icon={Plus} colorClass="text-[#050a30] hover:text-white hover:bg-[#050a30]" title="Novo Cargo" onClick={() => onTriggerAddCargoSafe(sector.setor.id)} />
+            <ActionButton icon={Stethoscope} colorClass="text-blue-600 hover:text-white hover:bg-blue-600" title="Gerenciar Exames Específicos" onClick={() => onHandleManageExams(sector)} />
+            <ActionButton icon={ShieldAlert} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Riscos do Setor" onClick={() => onHandleManageRisks(sector)} />
+            <ActionButton icon={Activity} colorClass="text-pink-500 hover:text-white hover:bg-pink-500" title="Exames do Setor" onClick={() => onTriggerPeriodicitySector(sector.setor)} />
+            <ActionButton icon={Edit2} colorClass="text-amber-500 hover:text-white hover:bg-amber-500" title="Renomear" onClick={() => onTriggerEditSector(sector.setor)} />
+            <ActionButton icon={Trash2} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Apagar" onClick={() => onTriggerDeleteSectorLink(sector.id)} />
+          </>
+        }
+      />
+    </div>
     {/* Roles */}
-    {sector.setor.cargo_setor && sector.setor.cargo_setor.length > 0 && (
+    {isSelected && sector.setor.cargo_setor && sector.setor.cargo_setor.length > 0 && (
       <>
-        <div className="w-12 h-[2px] bg-gray-300"></div>
+        <div className="w-12 h-[2px] bg-gray-300 animate-line"></div>
         <div className="flex flex-col gap-6 relative">
-          {sector.setor.cargo_setor.length > 1 && <div className="absolute left-[-2px] top-[24px] bottom-[24px] w-[2px] bg-gray-300"></div>}
+          {sector.setor.cargo_setor.length > 1 && <div className="absolute left-[-2px] top-[24px] bottom-[24px] w-[2px] bg-gray-300 origin-top animate-branch"></div>}
           {sector.setor.cargo_setor.map((cargo: any, cIdx: number) => (
             <CargoNode
               key={cargo.id}
@@ -300,37 +335,44 @@ interface UnitNodeProps {
   onTriggerViewDocs: (unit: any) => void;
   onTriggerEditUnit: (unit: any) => void;
   onTriggerDeleteUnit: (unitId: number) => void;
+  isSelected: boolean;
+  onSelect: (unitId: number | null, element?: HTMLElement) => void;
+  selectedSectorNodeId: number | null;
+  onSelectSector: (sectorId: number | null, element?: HTMLElement) => void;
 }
 
-const UnitNode = memo(({ unit, totalUnits, uIdx, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, onTriggerAddSectorSafe, onHandlePreparePCMSO, onTriggerBulkUpload, onTriggerViewDocs, onTriggerEditUnit, onTriggerDeleteUnit }: UnitNodeProps) => (
+const UnitNode = memo(({ unit, totalUnits, uIdx, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, onTriggerAddSectorSafe, onHandlePreparePCMSO, onTriggerBulkUpload, onTriggerViewDocs, onTriggerEditUnit, onTriggerDeleteUnit, isSelected, onSelect, selectedSectorNodeId, onSelectSector }: UnitNodeProps) => (
   <div className="flex items-center relative">
     <div className="w-8 h-[2px] bg-gray-300 shrink-0 relative">
       {uIdx === 0 && totalUnits > 1 && <div className="absolute left-0 top-0 bottom-[-50%] w-[2px] bg-gray-300"></div>}
       {uIdx === totalUnits - 1 && totalUnits > 1 && <div className="absolute left-0 bottom-0 top-[-50%] w-[2px] bg-gray-300"></div>}
     </div>
-    <TreeCard
-      icon={MapPin}
-      title={unit.nome_unidade}
-      subtitle={`ID: ${unit.id}`}
-      colorClass="text-[#149890]"
-      bgColorClass="bg-[#149890]/10"
-      actions={
-        <>
-          <ActionButton icon={Printer} colorClass="text-[#050a30] hover:text-white hover:bg-[#050a30]" title="Gerar PCMSO" onClick={() => onHandlePreparePCMSO(unit)} />
-          <ActionButton icon={Upload} colorClass="text-purple-600 hover:text-white hover:bg-purple-600" title="Carga Inicial" onClick={() => onTriggerBulkUpload(unit.id, unit.nome_unidade)} />
-          <ActionButton icon={FolderOpen} colorClass="text-[#04a7bd] hover:text-white hover:bg-[#04a7bd]" title="Documentos da Unidade" onClick={() => onTriggerViewDocs(unit)} />
-          <ActionButton icon={Plus} colorClass="text-[#149890] hover:text-white hover:bg-[#149890]" title="Novo Setor" onClick={() => onTriggerAddSectorSafe(unit.id)} />
-          <ActionButton icon={Edit2} colorClass="text-amber-500 hover:text-white hover:bg-amber-500" title="Renomear" onClick={() => onTriggerEditUnit(unit)} />
-          <ActionButton icon={Trash2} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Apagar" onClick={() => onTriggerDeleteUnit(unit.id)} />
-        </>
-      }
-    />
+    <div onClick={(e) => onSelect(isSelected ? null : unit.id, e.currentTarget)} className="cursor-pointer">
+      <TreeCard
+        icon={MapPin}
+        title={unit.nome_unidade}
+        subtitle={`ID: ${unit.id}`}
+        isActive={isSelected}
+        colorClass="text-[#149890]"
+        bgColorClass="bg-[#149890]/10"
+        actions={
+          <>
+            <ActionButton icon={Printer} colorClass="text-[#050a30] hover:text-white hover:bg-[#050a30]" title="Gerar PCMSO" onClick={() => onHandlePreparePCMSO(unit)} />
+            <ActionButton icon={Upload} colorClass="text-purple-600 hover:text-white hover:bg-purple-600" title="Carga Inicial" onClick={() => onTriggerBulkUpload(unit.id, unit.nome_unidade)} />
+            <ActionButton icon={FolderOpen} colorClass="text-[#04a7bd] hover:text-white hover:bg-[#04a7bd]" title="Documentos da Unidade" onClick={() => onTriggerViewDocs(unit)} />
+            <ActionButton icon={Plus} colorClass="text-[#149890] hover:text-white hover:bg-[#149890]" title="Novo Setor" onClick={() => onTriggerAddSectorSafe(unit.id)} />
+            <ActionButton icon={Edit2} colorClass="text-amber-500 hover:text-white hover:bg-amber-500" title="Renomear" onClick={() => onTriggerEditUnit(unit)} />
+            <ActionButton icon={Trash2} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Apagar" onClick={() => onTriggerDeleteUnit(unit.id)} />
+          </>
+        }
+      />
+    </div>
     {/* Sectors */}
-    {unit.unidade_setor && unit.unidade_setor.length > 0 && (
+    {isSelected && unit.unidade_setor && unit.unidade_setor.length > 0 && (
       <>
-        <div className="w-12 h-[2px] bg-gray-300"></div>
+        <div className="w-12 h-[2px] bg-gray-300 animate-line"></div>
         <div className="flex flex-col gap-8 relative">
-          {unit.unidade_setor.length > 1 && <div className="absolute left-[-2px] top-[30px] bottom-[30px] w-[2px] bg-gray-300"></div>}
+          {unit.unidade_setor.length > 1 && <div className="absolute left-[-2px] top-[30px] bottom-[30px] w-[2px] bg-gray-300 origin-top animate-branch"></div>}
           {unit.unidade_setor.map((sector: any, sIdx: number) => (
             <SectorNode
               key={sector.id}
@@ -351,6 +393,8 @@ const UnitNode = memo(({ unit, totalUnits, uIdx, expandedColabs, loadingColabs, 
               onTriggerDeleteSectorLink={onTriggerDeleteSectorLink}
               sIdx={sIdx}
               totalSectors={unit.unidade_setor.length}
+              isSelected={selectedSectorNodeId === sector.id}
+              onSelect={onSelectSector}
             />
           ))}
         </div>
@@ -1055,6 +1099,10 @@ export default function Dashboard({ session }: DashboardProps) {
   const [expandedColabs, setExpandedColabs] = useState<Record<string, any[]>>({});
   const [loadingColabs, setLoadingColabs] = useState<Record<string, boolean>>({});
 
+  // Progressive Expansion State
+  const [selectedUnitNodeId, setSelectedUnitNodeId] = useState<number | null>(null);
+  const [selectedSectorNodeId, setSelectedSectorNodeId] = useState<number | null>(null);
+
   // Modals State
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, loading: false });
   const [inputModal, setInputModal] = useState({ isOpen: false, title: '', initialValue: '', placeholder: '', onConfirm: (val: string) => { }, loading: false });
@@ -1575,6 +1623,51 @@ export default function Dashboard({ session }: DashboardProps) {
     if (canvasContentRef.current) canvasContentRef.current.style.transform = `translate(0px, 0px) scale(1)`;
     if (gridRef.current) gridRef.current.style.backgroundPosition = '0px 0px';
   }, []);
+
+  const centerOnNode = useCallback((element: HTMLElement) => {
+    // Wait a bit for React to render and the DOM to update heights/positions
+    setTimeout(() => {
+      if (!canvasContainerRef.current || !canvasContentRef.current) return;
+
+      const containerRect = canvasContainerRef.current.getBoundingClientRect();
+      // We re-query the element or its parent to get the most up-to-date position
+      const currentRect = element.getBoundingClientRect();
+
+      // Target: Center of the viewport
+      const targetX = containerRect.left + containerRect.width / 2;
+      const targetY = containerRect.top + containerRect.height / 2;
+
+      // Current: Center of the node
+      const currentX = currentRect.left + currentRect.width / 2;
+      const currentY = currentRect.top + currentRect.height / 2;
+
+      const dx = targetX - currentX;
+      const dy = targetY - currentY;
+
+      // Apply displacement to current Pan
+      panRef.current = {
+        x: panRef.current.x + dx,
+        y: panRef.current.y + dy
+      };
+
+      // Apply smoothly
+      if (canvasContentRef.current) {
+        // Increased duration and softer easing for a more comfortable move
+        canvasContentRef.current.style.transition = 'transform 1.2s cubic-bezier(0.2, 1, 0.3, 1)';
+        canvasContentRef.current.style.transform = `translate(${panRef.current.x}px, ${panRef.current.y}px) scale(${canvasScale})`;
+      }
+      if (gridRef.current) {
+        gridRef.current.style.transition = 'background-position 1.2s cubic-bezier(0.2, 1, 0.3, 1)';
+        gridRef.current.style.backgroundPosition = `${panRef.current.x}px ${panRef.current.y}px`;
+      }
+
+      // Cleanup transition
+      setTimeout(() => {
+        if (canvasContentRef.current) canvasContentRef.current.style.transition = 'none';
+        if (gridRef.current) gridRef.current.style.transition = 'none';
+      }, 1200);
+    }, 100); // 100ms is usually enough for React render + CSS transitions to start
+  }, [canvasScale]);
 
   // Re-apply transform whenever scale changes (pan is applied directly)
   useEffect(() => {
@@ -2360,7 +2453,13 @@ export default function Dashboard({ session }: DashboardProps) {
                   {/* Hierarchy Header */}
                   <div className="h-16 px-6 border-b border-gray-100 flex justify-between items-center bg-white/80 backdrop-blur-lg z-20 shrink-0">
                     <div className="flex items-center gap-4">
-                      <Button onClick={handleBack} className="!bg-gray-100 !text-gray-600 !shadow-none hover:!bg-gray-200 h-9 w-9 p-0 flex items-center justify-center rounded-full"><ArrowLeft size={20} /></Button>
+                      <button
+                        onClick={handleBack}
+                        className="bg-white text-[#050a30] border border-gray-200 shadow-sm hover:bg-gray-50 h-10 w-10 flex items-center justify-center rounded-full transition-all duration-200 active:scale-90 group"
+                        title="Voltar"
+                      >
+                        <ChevronLeft size={22} className="group-hover:-translate-x-0.5 transition-transform" />
+                      </button>
                       <div className="h-8 w-[1px] bg-gray-200 mx-2"></div>
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-[#04a7bd]/10 rounded-lg"><Network size={20} className="text-[#04a7bd]" /></div>
@@ -2423,6 +2522,7 @@ export default function Dashboard({ session }: DashboardProps) {
                               icon={Briefcase}
                               title={hierarchyCompany?.nome_fantasia || "Empresa"}
                               subtitle="Matriz"
+                              isActive={false}
                               colorClass="text-[#04a7bd]"
                               bgColorClass="bg-[#04a7bd]/10"
                               actions={<ActionButton icon={Plus} colorClass="text-[#04a7bd] hover:text-white hover:bg-[#04a7bd]" title="Nova Unidade" onClick={() => triggerAddUnitSafe(hierarchyCompany!.id)} />}
@@ -2459,6 +2559,17 @@ export default function Dashboard({ session }: DashboardProps) {
                                   onTriggerViewDocs={triggerViewDocs}
                                   onTriggerEditUnit={triggerEditUnit}
                                   onTriggerDeleteUnit={triggerDeleteUnit}
+                                  isSelected={selectedUnitNodeId === unit.id}
+                                  onSelect={(id, el) => {
+                                    setSelectedUnitNodeId(id);
+                                    setSelectedSectorNodeId(null); // Clear roles when switching unit
+                                    if (id && el) centerOnNode(el);
+                                  }}
+                                  selectedSectorNodeId={selectedSectorNodeId}
+                                  onSelectSector={(id, el) => {
+                                    setSelectedSectorNodeId(id);
+                                    if (id && el) centerOnNode(el);
+                                  }}
                                 />
                               ))}
                             </div>
