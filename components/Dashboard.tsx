@@ -166,48 +166,80 @@ interface CargoNodeProps {
   onTriggerDeleteCargoLink: (linkId: number) => void;
   cIdx: number;
   totalCargos: number;
+  sectorLinkId: number;
+  onDragStart: (sectorLinkId: number, cargoIndex: number) => void;
+  onDrop: (sectorLinkId: number, targetIndex: number) => void;
 }
 
-const CargoNode = memo(({ cargo, unitId, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, cIdx, totalCargos }: CargoNodeProps) => {
+const CargoNode = memo(({ cargo, unitId, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, cIdx, totalCargos, sectorLinkId, onDragStart, onDrop }: CargoNodeProps) => {
   const key = `${unitId}-${cargo.cargos.id}`;
   const colabsData = expandedColabs[key];
   const isLoading = loadingColabs[key];
+  const [isDragOver, setIsDragOver] = useState(false);
+
   return (
-    <div className="flex flex-col relative">
+    <div
+      className={`flex flex-col relative transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-500 rounded-xl bg-blue-50/50' : ''}`}
+      draggable
+      onDragStart={(e) => {
+        e.stopPropagation();
+        e.dataTransfer.setData('text/plain', cIdx.toString());
+        onDragStart(sectorLinkId, cIdx);
+      }}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+        onDrop(sectorLinkId, cIdx);
+      }}
+    >
       <div className="flex items-center">
+
         <div className="w-8 h-[2px] bg-gray-300 shrink-0 relative">
           {cIdx === 0 && totalCargos > 1 && <div className="absolute left-0 top-0 bottom-[-50%] w-[2px] bg-gray-300"></div>}
           {cIdx === totalCargos - 1 && totalCargos > 1 && <div className="absolute left-0 bottom-0 top-[-50%] w-[2px] bg-gray-300"></div>}
         </div>
-        <TreeCard
-          icon={UserCog}
-          title={cargo.cargos.nome}
-          subtitle="Cargo"
-          colorClass="text-[#04a7bd]"
-          bgColorClass="bg-[#04a7bd]/10"
-          extraInfo={
-            <div className="flex gap-1">
-              {cargo.periodicidade && (
-                <span className="text-[9px] font-bold text-white bg-pink-500 px-1.5 py-0.5 rounded-md flex items-center gap-0.5" title="Periodicidade de Exames">
-                  <Activity size={8} /> {cargo.periodicidade}m
-                </span>
-              )}
-              {cargo.descricao && (
-                <span className="text-[9px] font-bold text-white bg-amber-500 px-1.5 py-0.5 rounded-md flex items-center gap-0.5" title="Possui descrição de atividade">
-                  <FileText size={8} />
-                </span>
-              )}
-            </div>
-          }
-          actions={
-            <>
-              <ActionButton icon={Users} colorClass="text-blue-500 hover:text-white hover:bg-blue-500" title="Ver Colaboradores" onClick={() => onToggleCollaborators(unitId, cargo.cargos.id)} />
-              <ActionButton icon={Activity} colorClass="text-pink-500 hover:text-white hover:bg-pink-500" title="Periodicidade" onClick={() => onTriggerPeriodicityCargo(cargo)} />
-              <ActionButton icon={Edit2} colorClass="text-amber-500 hover:text-white hover:bg-amber-500" title="Editar Cargo e Descrição" onClick={() => onTriggerEditCargoDetails(cargo)} />
-              <ActionButton icon={Trash2} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Apagar" onClick={() => onTriggerDeleteCargoLink(cargo.id)} />
-            </>
-          }
-        />
+        <div className="cursor-grab active:cursor-grabbing shrink-0">
+          <TreeCard
+            icon={UserCog}
+            title={cargo.cargos.nome}
+            subtitle="Cargo"
+            colorClass="text-[#04a7bd]"
+            bgColorClass="bg-[#04a7bd]/10"
+            extraInfo={
+              <div className="flex gap-1">
+                {cargo.periodicidade && (
+                  <span className="text-[9px] font-bold text-white bg-pink-500 px-1.5 py-0.5 rounded-md flex items-center gap-0.5" title="Periodicidade de Exames">
+                    <Activity size={8} /> {cargo.periodicidade}m
+                  </span>
+                )}
+                {cargo.descricao && (
+                  <span className="text-[9px] font-bold text-white bg-amber-500 px-1.5 py-0.5 rounded-md flex items-center gap-0.5" title="Possui descrição de atividade">
+                    <FileText size={8} />
+                  </span>
+                )}
+              </div>
+            }
+            actions={
+              <>
+                <ActionButton icon={Users} colorClass="text-blue-500 hover:text-white hover:bg-blue-500" title="Ver Colaboradores" onClick={() => onToggleCollaborators(unitId, cargo.cargos.id)} />
+                <ActionButton icon={Activity} colorClass="text-pink-500 hover:text-white hover:bg-pink-500" title="Periodicidade" onClick={() => onTriggerPeriodicityCargo(cargo)} />
+                <ActionButton icon={Edit2} colorClass="text-amber-500 hover:text-white hover:bg-amber-500" title="Editar Cargo e Descrição" onClick={() => onTriggerEditCargoDetails(cargo)} />
+                <ActionButton icon={Trash2} colorClass="text-red-500 hover:text-white hover:bg-red-500" title="Apagar" onClick={() => onTriggerDeleteCargoLink(cargo.id)} />
+              </>
+            }
+          />
+        </div>
       </div>
       {/* COLLABORATOR EXPANSION LIST */}
       {colabsData !== undefined && (
@@ -269,9 +301,11 @@ interface SectorNodeProps {
   totalSectors: number;
   isSelected: boolean;
   onSelect: (sectorId: number | null, element?: HTMLElement) => void;
+  onDragCargoStart: (sectorLinkId: number, cargoIndex: number) => void;
+  onDropCargo: (sectorLinkId: number, targetIndex: number) => void;
 }
 
-const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, sIdx, totalSectors, isSelected, onSelect }: SectorNodeProps) => (
+const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, sIdx, totalSectors, isSelected, onSelect, onDragCargoStart, onDropCargo }: SectorNodeProps) => (
   <div className="flex items-center relative">
     <div className="w-8 h-[2px] bg-gray-300 shrink-0 relative">
       {sIdx === 0 && totalSectors > 1 && <div className="absolute left-0 top-0 bottom-[-50%] w-[2px] bg-gray-300"></div>}
@@ -317,8 +351,20 @@ const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onTogg
               onTriggerDeleteCargoLink={onTriggerDeleteCargoLink}
               cIdx={cIdx}
               totalCargos={sector.setor.cargo_setor.length}
+              sectorLinkId={sector.id}
+              onDragStart={onDragCargoStart}
+              onDrop={onDropCargo}
             />
           ))}
+          {/* Bottom Drop Zone */}
+          <div
+            className="h-4 -mt-4"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              onDropCargo(sector.id, sector.setor.cargo_setor.length);
+            }}
+          ></div>
         </div>
       </>
     )}
@@ -352,9 +398,11 @@ interface UnitNodeProps {
   onSelect: (unitId: number | null, element?: HTMLElement) => void;
   selectedSectorNodeId: number | null;
   onSelectSector: (sectorId: number | null, element?: HTMLElement) => void;
+  onDragCargoStart: (sectorLinkId: number, cargoIndex: number) => void;
+  onDropCargo: (sectorLinkId: number, targetIndex: number) => void;
 }
 
-const UnitNode = memo(({ unit, totalUnits, uIdx, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, onTriggerAddSectorSafe, onHandlePreparePCMSO, onTriggerBulkUpload, onTriggerViewDocs, onTriggerEditUnit, onTriggerDeleteUnit, isSelected, onSelect, selectedSectorNodeId, onSelectSector }: UnitNodeProps) => (
+const UnitNode = memo(({ unit, totalUnits, uIdx, expandedColabs, loadingColabs, onToggleCollaborators, onViewHistory, onTriggerPeriodicityCargo, onTriggerEditCargoDetails, onTriggerDeleteCargoLink, onTriggerAddCargoSafe, onHandleManageExams, onHandleManageRisks, onTriggerPeriodicitySector, onTriggerEditSector, onTriggerDeleteSectorLink, onTriggerAddSectorSafe, onHandlePreparePCMSO, onTriggerBulkUpload, onTriggerViewDocs, onTriggerEditUnit, onTriggerDeleteUnit, isSelected, onSelect, selectedSectorNodeId, onSelectSector, onDragCargoStart, onDropCargo }: UnitNodeProps) => (
   <div className="flex items-center relative">
     <div className="w-8 h-[2px] bg-gray-300 shrink-0 relative">
       {uIdx === 0 && totalUnits > 1 && <div className="absolute left-0 top-0 bottom-[-50%] w-[2px] bg-gray-300"></div>}
@@ -408,6 +456,8 @@ const UnitNode = memo(({ unit, totalUnits, uIdx, expandedColabs, loadingColabs, 
               totalSectors={unit.unidade_setor.length}
               isSelected={selectedSectorNodeId === sector.id}
               onSelect={onSelectSector}
+              onDragCargoStart={onDragCargoStart}
+              onDropCargo={onDropCargo}
             />
           ))}
         </div>
@@ -1301,6 +1351,74 @@ export default function Dashboard({ session }: DashboardProps) {
   // Progressive Expansion State
   const [selectedUnitNodeId, setSelectedUnitNodeId] = useState<number | null>(null);
   const [selectedSectorNodeId, setSelectedSectorNodeId] = useState<number | null>(null);
+
+  // Drag and Drop state
+  const draggedCargoRef = useRef<{ sectorLinkId: number, cargoIndex: number } | null>(null);
+
+  const handleDragCargoStart = useCallback((sectorLinkId: number, cargoIndex: number) => {
+    draggedCargoRef.current = { sectorLinkId, cargoIndex };
+  }, []);
+
+  const handleDropCargo = useCallback((sectorLinkId: number, targetIndex: number) => {
+    const draggedCargo = draggedCargoRef.current;
+    if (!draggedCargo) {
+      console.log('DnD [Reject]: draggedCargo is null');
+      return;
+    }
+    if (draggedCargo.sectorLinkId !== sectorLinkId) {
+      console.log('DnD [Reject]: different sector', draggedCargo.sectorLinkId, sectorLinkId);
+      return;
+    }
+
+    const sourceIndex = draggedCargo.cargoIndex;
+    if (sourceIndex === targetIndex) {
+      console.log('DnD [Reject]: same index', sourceIndex);
+      draggedCargoRef.current = null;
+      return;
+    }
+
+    console.log(`DnD [Accept]: Swapping index ${sourceIndex} with ${targetIndex}`);
+
+    setTimeout(() => {
+      setHierarchyData(prevData => {
+        const newData = [...prevData];
+        for (let i = 0; i < newData.length; i++) {
+          const unit = newData[i];
+          if (unit.unidade_setor) {
+            for (let j = 0; j < unit.unidade_setor.length; j++) {
+              const sector = unit.unidade_setor[j];
+              if (sector.id === sectorLinkId && sector.setor.cargo_setor) {
+                const newCargos = [...sector.setor.cargo_setor];
+
+                if (targetIndex < newCargos.length) {
+                  // Swap positions
+                  const temp = newCargos[sourceIndex];
+                  newCargos[sourceIndex] = newCargos[targetIndex];
+                  newCargos[targetIndex] = temp;
+                } else {
+                  // Handle drop on empty area at the bottom (move to end)
+                  const [draggedItem] = newCargos.splice(sourceIndex, 1);
+                  newCargos.push(draggedItem);
+                }
+
+                const newSectors = [...unit.unidade_setor];
+                newSectors[j] = {
+                  ...sector,
+                  setor: { ...sector.setor, cargo_setor: newCargos }
+                };
+
+                newData[i] = { ...unit, unidade_setor: newSectors };
+                return newData;
+              }
+            }
+          }
+        }
+        return prevData;
+      });
+    }, 0);
+
+    draggedCargoRef.current = null;
+  }, []);
 
   // Modals State
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => { }, loading: false });
@@ -2769,6 +2887,8 @@ export default function Dashboard({ session }: DashboardProps) {
                                     setSelectedSectorNodeId(id);
                                     if (id && el) centerOnNode(el);
                                   }}
+                                  onDragCargoStart={handleDragCargoStart}
+                                  onDropCargo={handleDropCargo}
                                 />
                               ))}
                             </div>
