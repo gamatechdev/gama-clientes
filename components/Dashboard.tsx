@@ -768,8 +768,22 @@ const RiskAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [newRiskData, setNewRiskData] = useState({ nome: '', desc: '', tipo: '6' });
+  const [expandedTypes, setExpandedTypes] = useState<number[]>([]);
+  const [showRiskCatalog, setShowRiskCatalog] = useState(false);
+  const [expandedCatalogTypes, setExpandedCatalogTypes] = useState<number[]>([]);
+  const catalogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { if (isOpen && sectorLinkId) { setMode('select'); setSearchTerm(''); fetchRisks(); } }, [isOpen, sectorLinkId]);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (catalogRef.current && !catalogRef.current.contains(event.target as Node)) {
+        setShowRiskCatalog(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => { if (isOpen && sectorLinkId) { setMode('select'); setSearchTerm(''); fetchRisks(); setExpandedTypes([]); } }, [isOpen, sectorLinkId]);
   const fetchRisks = async () => { setLoading(true); try { const { data: allRisks, error: rErr } = await supabase.from('riscos').select('*').order('nome'); if (rErr) throw rErr; setRisks((allRisks as unknown as Risco[]) || []); const { data: assigned, error: aErr } = await supabase.from('riscos_unidade').select('risco_id').eq('unidade_setor', sectorLinkId); if (aErr) throw aErr; const ids = assigned ? assigned.map(a => a.risco_id) : []; setInitialAssignedIds(ids); setSelectedRiskIds(ids); } catch (err) { console.error(err); alert('Erro ao carregar riscos.'); } finally { setLoading(false); } };
   const toggleSelection = (riscoId: number) => { setSelectedRiskIds(prev => prev.includes(riscoId) ? prev.filter(id => id !== riscoId) : [...prev, riscoId]); };
   const handleCreateRisk = async () => { if (!newRiskData.nome) { alert("Nome é obrigatório"); return; } setSaving(true); try { const { data, error } = await supabase.from('riscos').insert({ nome: newRiskData.nome, desc: newRiskData.desc, tipo: parseInt(newRiskData.tipo) }).select().single(); if (error) throw error; setRisks(prev => [...prev, data].sort((a, b) => a.nome.localeCompare(b.nome))); setSelectedRiskIds(prev => [...prev, data.id]); setNewRiskData({ nome: '', desc: '', tipo: '6' }); setMode('select'); setSearchTerm(''); } catch (err: any) { console.error(err); alert("Erro ao criar risco: " + err.message); } finally { setSaving(false); } };
@@ -787,9 +801,175 @@ const RiskAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
             <div className="flex items-center gap-3"><div className="p-2 bg-red-100 rounded-lg text-red-600"><ShieldAlert size={24} /></div><div><h3 className="text-xl font-bold text-[#050a30]">{mode === 'create' ? 'Cadastrar Novo Risco' : 'Gerenciar Riscos'}</h3><p className="text-sm text-gray-500">{sectorName}</p></div></div>
             <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"><X size={24} /></button>
           </div>
-          {!loading && mode === 'select' && (<div className="p-4 bg-white border-b border-gray-100 z-10 shrink-0"><Input placeholder="Pesquise para encontrar riscos..." icon={<Search size={18} />} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="!py-2.5" /></div>)}
+          {!loading && mode === 'select' && (
+            <div className="p-4 bg-white border-b border-gray-100 z-[130] shrink-0 relative" ref={catalogRef}>
+              <Input
+                placeholder="Pesquise para encontrar riscos..."
+                icon={<Search size={18} />}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  if (e.target.value.length > 0) setShowRiskCatalog(false);
+                }}
+                onFocus={() => setShowRiskCatalog(true)}
+                className="!py-2.5"
+              />
+
+              {showRiskCatalog && (
+                <div className="absolute top-full left-4 right-4 mt-1 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[140] max-h-[400px] overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Catálogo de Riscos</span>
+                    <button onClick={() => setShowRiskCatalog(false)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+                    {RISK_TYPES_MAP.map(type => {
+                      const groupRisks = risks.filter(r => r.tipo === type.id);
+                      if (groupRisks.length === 0) return null;
+
+                      const isExpanded = expandedCatalogTypes.includes(type.id);
+
+                      return (
+                        <div key={type.id} className="border border-gray-100 rounded-xl overflow-hidden bg-white">
+                          <button
+                            onClick={() => setExpandedCatalogTypes(prev => prev.includes(type.id) ? prev.filter(id => id !== type.id) : [...prev, type.id])}
+                            className="w-full flex items-center justify-between p-3 bg-gray-50/30 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${type.color.replace('text-', 'text-opacity-80 text-')}`}>
+                                {type.label.charAt(0)}
+                              </div>
+                              <span className="text-xs font-bold text-gray-600 capitalize">riscos {type.label.toLowerCase()}</span>
+                            </div>
+                            <ChevronDown size={14} className={`text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {isExpanded && (
+                            <div className="p-2 grid grid-cols-1 gap-1 bg-white border-t border-gray-50">
+                              {groupRisks.map(risk => {
+                                const isSelected = selectedRiskIds.includes(risk.id);
+                                return (
+                                  <div
+                                    key={risk.id}
+                                    onClick={() => toggleSelection(risk.id)}
+                                    className={`p-2 rounded-lg border text-left cursor-pointer transition-all flex items-center justify-between group ${isSelected ? 'bg-red-50 border-red-100' : 'bg-white border-transparent hover:bg-gray-50'}`}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className={`text-[11px] font-bold truncate ${isSelected ? 'text-red-700' : 'text-gray-700'}`}>{risk.nome}</p>
+                                    </div>
+                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center border transition-colors shrink-0 ${isSelected ? 'bg-red-500 border-red-500 text-white' : 'border-gray-200 group-hover:border-gray-300'}`}>
+                                      {isSelected && <Check size={10} />}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
-            {loading ? (<div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#04a7bd]"></div></div>) : mode === 'create' ? (<div className="p-6 space-y-5"><Input label="Nome do Risco" placeholder="Ex: Ruído Intermitente" value={newRiskData.nome} onChange={(e) => setNewRiskData({ ...newRiskData, nome: e.target.value })} /><div className="w-full"><label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Descrição Detalhada</label><textarea className="w-full bg-white/60 border border-gray-200/60 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd] focus:bg-white transition-all min-h-[100px] resize-none" placeholder="Descreva o risco..." value={newRiskData.desc} onChange={(e) => setNewRiskData({ ...newRiskData, desc: e.target.value })} /></div><div><label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Tipo de Risco</label><div className="relative"><select className="w-full bg-white border border-gray-200 text-[#050a30] rounded-xl py-3 px-4 pr-10 focus:outline-none focus:border-[#04a7bd] appearance-none" value={newRiskData.tipo} onChange={(e) => setNewRiskData({ ...newRiskData, tipo: e.target.value })}>{RISK_TYPES_MAP.map(t => (<option key={t.id} value={t.id}>{t.label}</option>))}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} /></div></div></div>) : (<div className="p-6">{visibleRisks.length === 0 ? (<div className="flex flex-col items-center justify-center py-10 text-center">{searchTerm ? (<><AlertCircle size={32} className="text-gray-300 mb-2" /><p className="text-gray-500 mb-4">Nenhum risco encontrado para "{searchTerm}"</p><Button onClick={() => setMode('create')} className="h-10 text-xs font-bold bg-white border border-[#04a7bd] text-[#04a7bd] hover:bg-[#04a7bd] hover:text-white !shadow-none"><Plus size={16} /> Cadastrar Novo Risco</Button></>) : (<><Search size={32} className="text-gray-300 mb-2" /><p className="text-gray-400">Use a busca acima para encontrar riscos <br /> ou veja os já atribuídos.</p></>)}</div>) : (<div className="space-y-2">{visibleRisks.map(risk => { const isSelected = selectedRiskIds.includes(risk.id); const riskType = getRiskLabel(risk.tipo); return (<div key={risk.id} onClick={() => toggleSelection(risk.id)} className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all hover:shadow-sm ${isSelected ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3 overflow-hidden"><div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${riskType?.color.replace('text-', 'text-opacity-80 text-')}`}>{riskType?.label.charAt(0)}</div><div className="min-w-0"><p className={`text-sm font-bold truncate ${isSelected ? 'text-red-800' : 'text-[#050a30]'}`}>{risk.nome}</p><p className="text-[10px] text-gray-400 truncate">{riskType?.label}</p></div></div><div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-colors shrink-0 ${isSelected ? 'bg-red-500 border-red-500 text-white' : 'border-gray-300 bg-white'}`}>{isSelected && <Check size={12} />}</div></div>); })}</div>)}</div>)}
+            {loading ? (
+              <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#04a7bd]"></div></div>
+            ) : mode === 'create' ? (
+              <div className="p-6 space-y-5">
+                <Input label="Nome do Risco" placeholder="Ex: Ruído Intermitente" value={newRiskData.nome} onChange={(e) => setNewRiskData({ ...newRiskData, nome: e.target.value })} />
+                <div className="w-full">
+                  <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Descrição Detalhada</label>
+                  <textarea className="w-full bg-white/60 border border-gray-200/60 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd] focus:bg-white transition-all min-h-[100px] resize-none" placeholder="Descreva o risco..." value={newRiskData.desc} onChange={(e) => setNewRiskData({ ...newRiskData, desc: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Tipo de Risco</label>
+                  <div className="relative">
+                    <select className="w-full bg-white border border-gray-200 text-[#050a30] rounded-xl py-3 px-4 pr-10 focus:outline-none focus:border-[#04a7bd] appearance-none" value={newRiskData.tipo} onChange={(e) => setNewRiskData({ ...newRiskData, tipo: e.target.value })}>
+                      {RISK_TYPES_MAP.map(t => (<option key={t.id} value={t.id}>{t.label}</option>))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-6">
+                {visibleRisks.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    {searchTerm ? (
+                      <>
+                        <AlertCircle size={32} className="text-gray-300 mb-2" />
+                        <p className="text-gray-500 mb-4">Nenhum risco encontrado para "{searchTerm}"</p>
+                        <Button onClick={() => setMode('create')} className="h-10 text-xs font-bold bg-white border border-[#04a7bd] text-[#04a7bd] hover:bg-[#04a7bd] hover:text-white !shadow-none">
+                          <Plus size={16} /> Cadastrar Novo Risco
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Search size={32} className="text-gray-300 mb-2" />
+                        <p className="text-gray-400">Use a busca acima para encontrar riscos <br /> ou veja os já atribuídos.</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {RISK_TYPES_MAP.map(type => {
+                      const groupRisks = visibleRisks.filter(r => r.tipo === type.id);
+                      if (groupRisks.length === 0) return null;
+
+                      const isExpanded = expandedTypes.includes(type.id) || searchTerm.length > 0;
+
+                      return (
+                        <div key={type.id} className="border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm transition-all duration-300">
+                          <button
+                            onClick={() => setExpandedTypes(prev => prev.includes(type.id) ? prev.filter(id => id !== type.id) : [...prev, type.id])}
+                            className="w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${type.color.replace('text-', 'text-opacity-80 text-')}`}>
+                                {type.label.charAt(0)}
+                              </div>
+                              <span className="text-sm font-bold text-gray-700 capitalize">riscos {type.label.toLowerCase()}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold bg-white px-2 py-0.5 rounded-full border border-gray-100 text-gray-400">
+                                {groupRisks.length}
+                              </span>
+                              <ChevronDown size={18} className={`text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="p-3 space-y-2 border-t border-gray-100 animate-in slide-in-from-top-2 duration-300 bg-white">
+                              {groupRisks.map(risk => {
+                                const isSelected = selectedRiskIds.includes(risk.id);
+                                return (
+                                  <div
+                                    key={risk.id}
+                                    onClick={() => toggleSelection(risk.id)}
+                                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all hover:shadow-sm ${isSelected ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100 hover:border-gray-200'}`}
+                                  >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                      <div className="min-w-0">
+                                        <p className={`text-xs font-bold truncate ${isSelected ? 'text-red-800' : 'text-[#050a30]'}`}>{risk.nome}</p>
+                                        <p className="text-[9px] text-gray-400 truncate">{risk.desc || 'Sem descrição'}</p>
+                                      </div>
+                                    </div>
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center border transition-colors shrink-0 ${isSelected ? 'bg-red-500 border-red-500 text-white' : 'border-gray-300 bg-white'}`}>
+                                      {isSelected && <Check size={12} />}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="p-4 border-t border-gray-100 bg-white flex gap-3 shrink-0">
             {mode === 'create' ? (<><Button onClick={() => setMode('select')} className="flex-1 bg-gray-100 text-gray-600 hover:bg-gray-200 !shadow-none">Cancelar</Button><Button onClick={handleCreateRisk} disabled={saving} className="flex-1">{saving ? 'Salvando...' : 'Salvar Risco'}</Button></>) : (<><Button onClick={onClose} className="flex-1 bg-gray-100 text-gray-600 hover:bg-gray-200 !shadow-none">Cancelar</Button><Button onClick={handleConfirmChanges} disabled={saving} className="flex-1 !bg-red-600 hover:!bg-red-700 text-white shadow-red-500/20">{saving ? 'Salvando...' : 'Confirmar Alterações'}</Button></>)}
