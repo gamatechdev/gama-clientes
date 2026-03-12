@@ -715,25 +715,6 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                             </Button>
                         )}
 
-                        {clientConfig.envia_prontuario && colab.ultimo_aso && (
-                            <Button
-                                onClick={(e) => handleOpenProntuario(e, colab.ultimo_aso!.id, colab.nome)}
-                                disabled={!colab.ultimo_aso.has_prontuario}
-                                className={`flex-1 h-10 text-xs font-bold !shadow-none rounded-xl flex items-center justify-center gap-2 ${!colab.ultimo_aso.has_prontuario ? '!bg-gray-100 !text-gray-400 cursor-not-allowed' : '!bg-purple-600 hover:!bg-purple-700 text-white'}`}
-                            >
-                                <ClipboardList size={16} /> Prontuário
-                            </Button>
-                        )}
-
-                        {clientConfig.envia_esoc && colab.ultimo_aso && (
-                            <Button
-                                onClick={(e) => handleOpenESoc(e, colab.ultimo_aso!.id, colab.nome)}
-                                disabled={!colab.ultimo_aso.has_esoc}
-                                className={`flex-1 h-10 text-xs font-bold !shadow-none rounded-xl flex items-center justify-center gap-2 ${!colab.ultimo_aso.has_esoc ? '!bg-gray-100 !text-gray-400 cursor-not-allowed' : '!bg-blue-800 hover:!bg-blue-900 text-white'}`}
-                            >
-                                <FileCheck size={16} /> eSocial
-                            </Button>
-                        )}
                         
                         <button className="w-10 h-10 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors shrink-0">
                            <ChevronRight size={20} />
