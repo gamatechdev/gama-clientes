@@ -2010,6 +2010,36 @@ export default function Dashboard({ session }: DashboardProps) {
     }
   };
 
+  const handleDeleteColab = async (colabId: string, colabNome: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Colaborador',
+      message: `Tem certeza que deseja excluir o colaborador "${colabNome}"? Esta ação não pode ser desfeita.`,
+      loading: false,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        try {
+          const { error } = await supabase
+            .from('colaboradores')
+            .delete()
+            .eq('id', colabId);
+
+          if (error) throw error;
+
+          setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
+          
+          // Refresh the overview list
+          const floatingBtn = document.querySelector('button[title="Ver todos os colaboradores"]') as HTMLButtonElement;
+          if (floatingBtn) floatingBtn.click();
+
+        } catch (err: any) {
+          alert("Erro ao excluir: " + err.message);
+          setConfirmModal(prev => ({ ...prev, loading: false }));
+        }
+      }
+    });
+  };
+
   const handleSaveColabEdit = async () => {
     if (!editColabModal.colab || !editColabModal.selectedSectorId || !editColabModal.selectedCargoId) return;
 
@@ -3841,6 +3871,13 @@ export default function Dashboard({ session }: DashboardProps) {
                                                     title="Editar setor e cargo"
                                                   >
                                                     <Pencil size={14} />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => handleDeleteColab(colab.id, colab._nomeDisplay || colab.nome)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Excluir colaborador"
+                                                  >
+                                                    <Trash2 size={14} />
                                                   </button>
                                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                                     colab.ativo === 'ativo'
