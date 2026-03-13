@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Session } from '@supabase/supabase-js';
 import { GlassCard, Button, Input, PageTitle } from './ui/GlassComponents';
 import { Cliente, Unidade, Setor, Cargo, LinkedCargo, LinkedSetor, HierarchyUnit, Exame, UserProfile } from '../types';
-import { Building2, MapPin, Plus, ArrowLeft, ChevronLeft, Search, LogOut, Briefcase, Layers, Link as LinkIcon, UserCog, Trash2, Network, X, Edit2, AlertTriangle, ChevronDown, Activity, Save, FileText, FolderOpen, Download, ExternalLink, Calendar, CheckCircle, Clock, UploadCloud, Link, UserPlus, Mail, Lock, Camera, LayoutDashboard, PieChart, Users, Menu, ChevronRight, BarChart3, TrendingUp, AlertCircle, ArrowUpRight, Move, User, History, Printer, ShieldAlert, Check, Stethoscope, ArrowRight, Copy, ZoomIn, ZoomOut, Maximize, ChevronsLeft, ChevronsRight, Upload } from 'lucide-react';
+import { Building2, MapPin, Plus, ArrowLeft, ChevronLeft, Search, LogOut, Briefcase, Layers, Link as LinkIcon, UserCog, Trash2, Network, X, Edit2, AlertTriangle, ChevronDown, Activity, Save, FileText, FolderOpen, Download, ExternalLink, Calendar, CheckCircle, Clock, UploadCloud, Link, UserPlus, Mail, Lock, Camera, LayoutDashboard, PieChart, Users, Menu, ChevronRight, BarChart3, TrendingUp, AlertCircle, ArrowUpRight, Move, User, History, Printer, ShieldAlert, Check, Stethoscope, ArrowRight, Copy, ZoomIn, ZoomOut, Maximize, ChevronsLeft, ChevronsRight, Upload, Pencil, PlusCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface DashboardProps {
@@ -562,14 +562,44 @@ const LineChart = ({ data, labels, color = '#04a7bd' }: { data: number[], labels
 
 // --- Modals ---
 
-const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading }: { isOpen: boolean, unitId: number, unitName: string, onClose: () => void, onConfirm: (data: any[]) => void, loading: boolean }) => {
+const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading, availableSectors, availableCargos, onRefreshData }: { isOpen: boolean, unitId: number, unitName: string, onClose: () => void, onConfirm: (data: any[]) => void, loading: boolean, availableSectors: any[], availableCargos: any[], onRefreshData: () => void }) => {
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isParsing, setIsParsing] = useState(false);
+
+  // Selection State
+  const [editingCargoIdx, setEditingCargoIdx] = useState<number | null>(null);
+  const [cargoSearch, setCargoSearch] = useState('');
+  const [cargoMode, setCargoMode] = useState<'select' | 'create'>('select');
+  const [newCargoName, setNewCargoName] = useState('');
+
+  const [editingSectorIdx, setEditingSectorIdx] = useState<number | null>(null);
+  const [sectorSearch, setSectorSearch] = useState('');
+  const [sectorMode, setSectorMode] = useState<'select' | 'create'>('select');
+  const [newSectorName, setNewSectorName] = useState('');
+
+  const [savingEntity, setSavingEntity] = useState(false);
+  const [creationConfirm, setCreationConfirm] = useState<{ isOpen: boolean, sectors: string[], cargos: string[] }>({ isOpen: false, sectors: [], cargos: [] });
+
+  const toTitleCase = (str: string) => {
+    if (!str) return '';
+    const lowercase = str.trim().toLowerCase();
+    return lowercase.charAt(0).toUpperCase() + lowercase.slice(1);
+  };
 
   useEffect(() => {
     if (!isOpen) {
       setPreviewData([]);
       setIsParsing(false);
+      setEditingCargoIdx(null);
+      setCargoSearch('');
+      setCargoMode('select');
+      setNewCargoName('');
+      setEditingSectorIdx(null);
+      setSectorSearch('');
+      setSectorMode('select');
+      setNewSectorName('');
+      setSavingEntity(false);
+      setCreationConfirm({ isOpen: false, sectors: [], cargos: [] });
     }
   }, [isOpen]);
 
@@ -586,16 +616,40 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
-        // Filter Logic: Column U (index 20) == 101
-        // Skip header (row 0)
+        // Filter Logic: Column U (index 20) == 101, Skip header
         const filtered = jsonData.filter((row, index) => {
-          if (index === 0) return false; // Skip header
+          if (index === 0) return false;
           const colU = row[20];
-          // Check loosely for string "101" or number 101
           return colU == 101 || String(colU).trim() === '101';
         });
 
-        setPreviewData(filtered);
+        // Map to stateful objects with matched IDs
+        const mapped = filtered.map((row, idx) => {
+          const excelSector = String(row[23] || '').trim().toLowerCase();
+          const excelCargo = String(row[22] || '').trim().toLowerCase();
+
+          // Auto-match Logic (Normalized)
+          const normalize = (val: string) => String(val || '').trim().toLowerCase();
+          const normExcelSector = normalize(row[23]);
+          const normExcelCargo = normalize(row[22]);
+
+          const matchedSector = availableSectors.find(s => normalize(s.nome) === normExcelSector);
+          const matchedCargo = availableCargos.find(c => normalize(c.nome) === normExcelCargo);
+
+          return {
+            id: idx,
+            originalRow: row,
+            nome: row[3],
+            cpf: row[4],
+            nascimento: row[47],
+            sectorId: matchedSector ? String(matchedSector.id) : '',
+            cargoId: matchedCargo ? String(matchedCargo.id) : '',
+            excelSectorName: row[23],
+            excelCargoName: row[22]
+          };
+        });
+
+        setPreviewData(mapped);
       } catch (err) {
         console.error("Erro ao ler arquivo:", err);
         alert("Erro ao ler o arquivo Excel.");
@@ -605,13 +659,85 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
     }
   };
 
+  const updateRow = (idx: number, field: string, value: string) => {
+    setPreviewData(prev => prev.map(row => row.id === idx ? { ...row, [field]: value } : row));
+  };
+
+  const handleCreateNewSector = async () => {
+    if (!newSectorName.trim()) return;
+    setSavingEntity(true);
+    try {
+      const { data, error } = await supabase.from('setor').insert({ nome: newSectorName.trim() }).select().single();
+      if (error) throw error;
+      if (data) {
+        updateRow(editingSectorIdx!, 'sectorId', String(data.id));
+        onRefreshData();
+        setEditingSectorIdx(null);
+      }
+    } catch (err: any) {
+      alert("Erro ao criar setor: " + err.message);
+    } finally {
+      setSavingEntity(false);
+    }
+  };
+
+  const handleCreateNewCargo = async () => {
+    if (!newCargoName.trim()) return;
+    setSavingEntity(true);
+    try {
+      const { data, error } = await supabase.from('cargos').insert({ nome: newCargoName.trim(), ativo: true }).select().single();
+      if (error) throw error;
+      if (data) {
+        updateRow(editingCargoIdx!, 'cargoId', String(data.id));
+        onRefreshData();
+        setEditingCargoIdx(null);
+      }
+    } catch (err: any) {
+      alert("Erro ao criar cargo: " + err.message);
+    } finally {
+      setSavingEntity(false);
+    }
+  };
+
+  const highlightMatch = (text: string, search: string) => {
+    if (!search.trim()) return <span>{text}</span>;
+    const idx = text.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return <span>{text}</span>;
+    return (
+      <span>
+        {text.slice(0, idx)}
+        <mark className="bg-[#04a7bd]/20 text-[#04a7bd] font-bold rounded px-0.5">{text.slice(idx, idx + search.length)}</mark>
+        {text.slice(idx + search.length)}
+      </span>
+    );
+  };
+
   const handleConfirm = () => {
+    // Validate that all have EITHER sectorId OR excelSectorName (and same for cargo)
+    const incomplete = previewData.some(r => (!r.sectorId && !r.excelSectorName) || (!r.cargoId && !r.excelCargoName));
+    if (incomplete) {
+      alert("Por favor, garanta que todos os colaboradores tenham um setor e cargo identificados.");
+      return;
+    }
+
+    const normalizedNewSectors = Array.from(new Set(previewData.filter(r => !r.sectorId).map(r => toTitleCase(r.excelSectorName))));
+    const normalizedNewCargos = Array.from(new Set(previewData.filter(r => !r.cargoId).map(r => toTitleCase(r.excelCargoName))));
+
+    if (normalizedNewSectors.length > 0 || normalizedNewCargos.length > 0) {
+      setCreationConfirm({
+        isOpen: true,
+        sectors: normalizedNewSectors,
+        cargos: normalizedNewCargos
+      });
+      return;
+    }
+
     onConfirm(previewData);
   };
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-      <GlassCard className={`w-full ${previewData.length > 0 ? 'max-w-4xl' : 'max-w-md'} bg-white border-none shadow-2xl p-6 transition-all duration-300`}>
+      <GlassCard className={`w-full ${previewData.length > 0 ? 'max-w-[1200px]' : 'max-w-md'} bg-white border-none shadow-2xl p-6 transition-all duration-300 relative overflow-hidden`}>
         <div className="flex items-center gap-3 mb-4">
           <div className="p-3 bg-purple-100 rounded-full text-purple-600"><Upload size={24} /></div>
           <div>
@@ -638,7 +764,7 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
               <p className="text-sm font-bold text-[#050a30]">{previewData.length} Colaboradores Encontrados (Filtro U=101)</p>
               <button onClick={() => setPreviewData([])} className="text-xs text-red-500 hover:underline">Trocar Arquivo</button>
             </div>
-            <div className="max-h-[300px] overflow-y-auto custom-scrollbar border border-gray-200 rounded-xl">
+            <div className="max-h-[500px] overflow-y-auto custom-scrollbar border border-gray-200 rounded-xl">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 text-gray-500 sticky top-0 font-bold uppercase">
                   <tr>
@@ -650,27 +776,214 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {previewData.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="p-3 text-[#050a30] font-medium">{row[3]}</td>
-                      <td className="p-3 text-gray-600">{row[4]}</td>
-                      <td className="p-3 text-gray-600">{row[23]}</td>
-                      <td className="p-3 text-gray-600">{row[22]}</td>
-                      <td className="p-3 text-gray-600">{row[47]}</td>
+                  {previewData.map((row) => (
+                    <tr key={row.id} className="hover:bg-gray-50">
+                      <td className="p-3 text-[#050a30] font-medium max-w-[200px] truncate">{row.nome}</td>
+                      <td className="p-3 text-gray-500 font-mono">{row.cpf}</td>
+                      <td className="p-3">
+                        <button
+                          onClick={() => { setEditingSectorIdx(row.id); setSectorSearch(''); }}
+                          className={`w-full p-2.5 text-left border rounded-xl text-xs font-bold transition-all flex items-center justify-between group ${!row.sectorId ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-gray-50 border-gray-100 text-[#04a7bd] hover:border-[#04a7bd]'}`}
+                        >
+                          <span className="truncate">
+                            {row.sectorId ? (availableSectors || []).find(s => String(s.id) === String(row.sectorId))?.nome : (row.excelSectorName || 'Selecionar Setor...')}
+                          </span>
+                          <ChevronDown size={14} className="text-gray-400 group-hover:text-[#04a7bd]" />
+                        </button>
+                        {!row.sectorId && <p className="text-[10px] text-amber-600 mt-1 italic leading-tight">Planilha: {row.excelSectorName}</p>}
+                      </td>
+                      <td className="p-3">
+                        <button
+                          onClick={() => { setEditingCargoIdx(row.id); setCargoSearch(''); }}
+                          className={`w-full p-2.5 text-left border rounded-xl text-xs font-bold transition-all flex items-center justify-between group ${!row.cargoId ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-gray-50 border-gray-100 text-[#04a7bd] hover:border-[#04a7bd]'}`}
+                        >
+                          <span className="truncate">
+                            {row.cargoId ? (availableCargos || []).find(c => String(c.id) === String(row.cargoId))?.nome : (row.excelCargoName || 'Selecionar Cargo...')}
+                          </span>
+                          <ChevronDown size={14} className="text-gray-400 group-hover:text-[#04a7bd]" />
+                        </button>
+                        {!row.cargoId && <p className="text-[10px] text-amber-600 mt-1 italic leading-tight">Planilha: {row.excelCargoName}</p>}
+                      </td>
+                      <td className="p-3 text-gray-400">{row.nascimento}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+
+            {/* Sector Selector Overlay */}
+            {editingSectorIdx !== null && (
+              <div className="absolute inset-0 z-[140] flex items-center justify-center p-6 sm:p-12">
+                <div className="absolute inset-0 bg-[#050a30]/60 backdrop-blur-md animate-in fade-in duration-300 rounded-[28px]" onClick={() => setEditingSectorIdx(null)}></div>
+                <GlassCard className="w-full max-w-2xl bg-white border-none shadow-2xl overflow-hidden p-0 relative z-10 animate-in zoom-in-95 duration-200">
+                  <div className="bg-gradient-to-br from-[#050a30] to-[#0d1654] p-6 text-white text-center">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-white/10 rounded-xl"><MapPin size={24} /></div>
+                        <div>
+                          <h3 className="text-xl font-bold leading-tight uppercase">Vincular Setor</h3>
+                          <p className="text-white/50 text-xs font-mono tracking-widest uppercase">Base de Dados Global</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setEditingSectorIdx(null)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"><X size={20} /></button>
+                    </div>
+                    <div className="flex bg-white/10 p-1 rounded-xl mb-4 gap-1">
+                      <button onClick={() => setSectorMode('select')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${sectorMode === 'select' ? 'bg-white text-[#050a30]' : 'text-white/70 hover:text-white'}`}>Selecionar</button>
+                      <button onClick={() => setSectorMode('create')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${sectorMode === 'create' ? 'bg-white text-[#050a30]' : 'text-white/70 hover:text-white'}`}>Novo</button>
+                    </div>
+                    {sectorMode === 'select' ? (
+                      <div className="relative">
+                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                        <input 
+                          type="text" 
+                          value={sectorSearch} 
+                          onChange={(e) => setSectorSearch(e.target.value)} 
+                          placeholder="Pesquisar setor por nome..." 
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
+                          autoFocus 
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                        <input 
+                          type="text" 
+                          value={newSectorName} 
+                          onChange={(e) => setNewSectorName(e.target.value)} 
+                          placeholder="Nome do novo setor..." 
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
+                          autoFocus 
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-6 max-h-[500px] overflow-y-auto custom-scrollbar bg-gray-50/50">
+                    {sectorMode === 'select' ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {(availableSectors || [])
+                          .filter(s => s.nome.toLowerCase().includes(sectorSearch.toLowerCase()))
+                          .map(sector => (
+                          <button key={sector.id} onClick={() => { updateRow(editingSectorIdx, 'sectorId', String(sector.id)); setEditingSectorIdx(null); }} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left bg-white shadow-sm hover:border-[#04a7bd] hover:shadow-md ${String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) ? 'border-[#04a7bd] bg-[#04a7bd]/5' : 'border-transparent'}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) ? 'bg-[#04a7bd] text-white' : 'bg-gray-100 text-gray-400 font-bold'}`}><MapPin size={18} /></div>
+                              <span className="text-sm font-black text-[#050a30]">{highlightMatch(sector.nome, sectorSearch)}</span>
+                            </div>
+                            {String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) && <CheckCircle size={20} className="text-[#04a7bd]" />}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-4 py-6">
+                        <p className="text-[#050a30] font-bold text-center">Cadastrar "{newSectorName || '...'}" como novo setor?</p>
+                        <button 
+                          onClick={handleCreateNewSector}
+                          disabled={savingEntity || !newSectorName.trim()}
+                          className="px-8 py-3 bg-[#04a7bd] text-white rounded-xl font-bold shadow-lg shadow-[#04a7bd]/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                        >
+                          {savingEntity ? 'Cadastrando...' : 'Confirmar Cadastro'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+              </div>
+            )}
+
+            {/* Cargo Selector Overlay */}
+            {editingCargoIdx !== null && (
+              <div className="absolute inset-0 z-[140] flex items-center justify-center p-6 sm:p-12">
+                <div className="absolute inset-0 bg-[#050a30]/60 backdrop-blur-md animate-in fade-in duration-300 rounded-[28px]" onClick={() => setEditingCargoIdx(null)}></div>
+                <GlassCard className="w-full max-w-2xl bg-white border-none shadow-2xl overflow-hidden p-0 relative z-10 animate-in zoom-in-95 duration-200">
+                  <div className="bg-gradient-to-br from-[#050a30] to-[#0d1654] p-6 text-white text-center">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-white/10 rounded-xl"><Briefcase size={24} /></div>
+                        <div>
+                          <h3 className="text-xl font-bold leading-tight uppercase">Vincular Cargo</h3>
+                          <p className="text-white/50 text-xs font-mono tracking-widest uppercase">Base de Dados Global</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setEditingCargoIdx(null)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"><X size={20} /></button>
+                    </div>
+                    <div className="flex bg-white/10 p-1 rounded-xl mb-4 gap-1">
+                      <button onClick={() => setCargoMode('select')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${cargoMode === 'select' ? 'bg-white text-[#050a30]' : 'text-white/70 hover:text-white'}`}>Selecionar</button>
+                      <button onClick={() => setCargoMode('create')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${cargoMode === 'create' ? 'bg-white text-[#050a30]' : 'text-white/70 hover:text-white'}`}>Novo</button>
+                    </div>
+                    {cargoMode === 'select' ? (
+                      <div className="relative">
+                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                        <input 
+                          type="text" 
+                          value={cargoSearch} 
+                          onChange={(e) => setCargoSearch(e.target.value)} 
+                          placeholder="Pesquisar cargo por nome..." 
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
+                          autoFocus 
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                        <input 
+                          type="text" 
+                          value={newCargoName} 
+                          onChange={(e) => setNewCargoName(e.target.value)} 
+                          placeholder="Nome do novo cargo..." 
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
+                          autoFocus 
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-6 max-h-[500px] overflow-y-auto custom-scrollbar bg-gray-50/50">
+                    {cargoMode === 'select' ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {(availableCargos || [])
+                          .filter(c => c.nome.toLowerCase().includes(cargoSearch.toLowerCase()))
+                          .map(cargo => (
+                          <button key={cargo.id} onClick={() => { updateRow(editingCargoIdx, 'cargoId', String(cargo.id)); setEditingCargoIdx(null); }} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left bg-white shadow-sm hover:border-[#04a7bd] hover:shadow-md ${String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) ? 'border-[#04a7bd] bg-[#04a7bd]/5' : 'border-transparent'}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) ? 'bg-[#04a7bd] text-white' : 'bg-gray-100 text-gray-400 font-bold'}`}><Briefcase size={18} /></div>
+                              <span className="text-sm font-black text-[#050a30]">{highlightMatch(cargo.nome, cargoSearch)}</span>
+                            </div>
+                            {String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) && <CheckCircle size={20} className="text-[#04a7bd]" />}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-4 py-6">
+                        <p className="text-[#050a30] font-bold text-center">Cadastrar "{newCargoName || '...'}" como novo cargo?</p>
+                        <button 
+                          onClick={handleCreateNewCargo}
+                          disabled={savingEntity || !newCargoName.trim()}
+                          className="px-8 py-3 bg-[#04a7bd] text-white rounded-xl font-bold shadow-lg shadow-[#04a7bd]/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                        >
+                          {savingEntity ? 'Cadastrando...' : 'Confirmar Cadastro'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+              </div>
+            )}
           </div>
         )}
 
-        <div className="flex gap-3 w-full">
-          <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-gray-100 font-medium text-gray-600 hover:bg-gray-200 transition-colors">Cancelar</button>
-          <button onClick={handleConfirm} disabled={loading || previewData.length === 0} className="flex-1 py-3 rounded-xl bg-[#04a7bd] font-medium text-white hover:bg-[#038e9e] transition-colors shadow-lg shadow-[#04a7bd]/20 disabled:opacity-70 flex items-center justify-center gap-2">
-            {loading ? 'Processando Lotes...' : 'Confirmar Importação'}
-          </button>
-        </div>
+        <div className="flex gap-3 mt-4">
+            <button
+              onClick={handleConfirm}
+              disabled={loading || previewData.length === 0}
+              className="flex-1 py-3 bg-[#04a7bd] text-white rounded-xl font-bold hover:bg-[#038e9e] transition-all shadow-lg shadow-[#04a7bd]/20 disabled:opacity-50"
+            >
+              {loading ? 'Processando...' : 'Confirmar Importação'}
+            </button>
+            <button
+              onClick={onClose}
+              className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
+            >
+              Cancelar
+            </button>
+          </div>
       </GlassCard>
     </div>
   );
@@ -1215,6 +1528,70 @@ const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, loadin
   );
 };
 
+const ImportCreationConfirmModal = ({ isOpen, newSectors, newCargos, onConfirm, onCancel }: { isOpen: boolean, newSectors: string[], newCargos: string[], onConfirm: () => void, onCancel: () => void }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#050a30]/60 backdrop-blur-md animate-in fade-in duration-300 p-4">
+      <GlassCard className="w-full max-w-lg bg-white border-none shadow-2xl overflow-hidden p-0 relative animate-in zoom-in-95 duration-200 rounded-[32px]">
+        <div className="bg-gradient-to-br from-[#050a30] to-[#0d1654] p-8 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 bg-[#04a7bd] rounded-2xl flex items-center justify-center shadow-lg shadow-[#04a7bd]/20">
+              <PlusCircle size={24} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">Novos Itens Detectados</h3>
+              <p className="text-white/50 text-xs font-bold uppercase tracking-widest mt-0.5">Confirmação de Cadastro Automático</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8 space-y-6">
+          <div className="space-y-4">
+            {newSectors.length > 0 && (
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 block">Setores a serem criados ({newSectors.length})</label>
+                <div className="flex flex-wrap gap-2">
+                  {newSectors.map((s, i) => (
+                    <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold border border-blue-100 flex items-center gap-2">
+                      <MapPin size={12} /> {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {newCargos.length > 0 && (
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 block">Cargos a serem criados ({newCargos.length})</label>
+                <div className="flex flex-wrap gap-2">
+                  {newCargos.map((c, i) => (
+                    <span key={i} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold border border-purple-100 flex items-center gap-2">
+                      <Briefcase size={12} /> {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">
+            <AlertCircle size={20} className="text-amber-600 shrink-0" />
+            <p className="text-sm text-amber-800 font-medium leading-relaxed">
+              Ao confirmar, esses novos itens serão cadastrados globalmente no banco de dados e vinculados aos colaboradores desta importação.
+            </p>
+          </div>
+
+          <div className="flex gap-4 pt-2">
+            <button onClick={onCancel} className="flex-1 py-4 px-6 bg-gray-100 text-gray-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition-all active:scale-95">Revisar Planilha</button>
+            <button onClick={onConfirm} className="flex-[1.5] py-4 px-6 bg-[#04a7bd] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-[#04a7bd]/20 hover:scale-[1.02] active:scale-95 transition-all">Confirmar e Importar</button>
+          </div>
+        </div>
+      </GlassCard>
+    </div>
+  );
+};
+
 const PeriodicityModal = ({ isOpen, targetName, currentPeriodicity, onConfirm, onCancel, loading }: any) => {
   const [selectedOption, setSelectedOption] = useState<string>(''); const [manualValue, setManualValue] = useState<string>('');
   useEffect(() => { if (isOpen) { if ([6, 12, 24].includes(currentPeriodicity)) { setSelectedOption(currentPeriodicity.toString()); setManualValue(''); } else if (currentPeriodicity) { setSelectedOption('manual'); setManualValue(currentPeriodicity.toString()); } else { setSelectedOption(''); setManualValue(''); } } }, [isOpen, currentPeriodicity]);
@@ -1262,17 +1639,189 @@ const InputModal = ({ isOpen, title, initialValue, placeholder, onConfirm, onCan
 };
 
 const AddEntityModal = ({ isOpen, title, entityLabel, availableOptions, onConfirm, onCancel, loading }: any) => {
-  const [mode, setMode] = useState<'create' | 'select'>('select'); const [newValue, setNewValue] = useState(''); const [selectedId, setSelectedId] = useState('');
-  useEffect(() => { if (isOpen) { setMode('select'); setNewValue(''); setSelectedId(''); } }, [isOpen]);
+  const [mode, setMode] = useState<'create' | 'select'>('select');
+  const [newValue, setNewValue] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (isOpen) { setMode('select'); setNewValue(''); setSelectedId(''); setSearch(''); }
+  }, [isOpen]);
+
   if (!isOpen) return null;
-  const handleConfirm = () => { if (mode === 'create' && newValue.trim()) { onConfirm({ mode: 'create', value: newValue }); } else if (mode === 'select' && selectedId) { onConfirm({ mode: 'select', id: selectedId }); } };
+
+  const handleConfirm = () => {
+    if (mode === 'create' && newValue.trim()) { onConfirm({ mode: 'create', value: newValue }); }
+    else if (mode === 'select' && selectedId) { onConfirm({ mode: 'select', id: selectedId }); }
+  };
+
+  const filtered = (availableOptions || []).filter((opt: any) => {
+    const name = (opt.nome || opt.nome_unidade || '');
+    return name.toLowerCase().includes(search.toLowerCase());
+  });
+
+  const highlightMatch = (text: string) => {
+    if (!search.trim()) return <span>{text}</span>;
+    const idx = text.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return <span>{text}</span>;
+    return (
+      <span>
+        {text.slice(0, idx)}
+        <mark className="bg-[#04a7bd]/20 text-[#04a7bd] font-bold rounded px-0.5">{text.slice(idx, idx + search.length)}</mark>
+        {text.slice(idx + search.length)}
+      </span>
+    );
+  };
+
+  const selectedName = (() => {
+    if (!selectedId) return null;
+    const opt = (availableOptions || []).find((o: any) => String(o.id) === String(selectedId));
+    return opt ? (opt.nome || opt.nome_unidade) : null;
+  })();
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <GlassCard className="w-full max-w-md p-6 bg-white border-none shadow-2xl">
-        <h3 className="text-xl font-bold text-[#050a30] mb-4">{title}</h3>
-        <div className="flex bg-gray-100 p-1 rounded-xl mb-6"><button onClick={() => setMode('select')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'select' ? 'bg-white text-[#04a7bd] shadow-sm' : 'text-gray-500'}`}>Selecionar Existente</button><button onClick={() => setMode('create')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'create' ? 'bg-white text-[#04a7bd] shadow-sm' : 'text-gray-500'}`}>Cadastrar Novo</button></div>
-        <div className="min-h-[100px]">{mode === 'select' ? (<div className="space-y-2"><label className="text-sm font-medium text-gray-600 ml-1">Buscar {entityLabel}</label>{availableOptions && availableOptions.length > 0 ? (<div className="relative"><select className="w-full bg-gray-50 border border-gray-200 text-[#050a30] rounded-xl py-3 px-4 pr-10 focus:outline-none focus:border-[#04a7bd] appearance-none transition-colors" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}><option value="">Selecione...</option>{availableOptions.map((opt: any) => (<option key={opt.id} value={opt.id}>{opt.nome || opt.nome_unidade}</option>))}</select><div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><ChevronDown size={16} /></div></div>) : (<div className="p-4 bg-yellow-50 text-yellow-700 text-sm rounded-xl border border-yellow-100 flex items-center gap-2"><AlertTriangle size={16} /> Não há {entityLabel}s disponíveis.</div>)}</div>) : (<Input label={`Nome do ${entityLabel}`} placeholder={`Ex: Novo ${entityLabel}`} value={newValue} onChange={(e) => setNewValue(e.target.value)} autoFocus />)}</div>
-        <div className="flex gap-3 w-full mt-6"><button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-gray-100 font-medium text-gray-600 hover:bg-gray-200 transition-colors">Cancelar</button><button onClick={handleConfirm} disabled={loading || (mode === 'create' && !newValue.trim()) || (mode === 'select' && !selectedId)} className="flex-1 py-3 rounded-xl bg-[#04a7bd] font-medium text-white hover:bg-[#038e9e] transition-colors shadow-lg shadow-[#04a7bd]/20 disabled:opacity-70 disabled:cursor-not-allowed">{loading ? 'Salvando...' : 'Salvar'}</button></div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+      <GlassCard className="w-full max-w-md bg-white border-none shadow-2xl overflow-hidden p-0">
+
+        {/* Header */}
+        <div className="bg-gradient-to-br from-[#050a30] to-[#0d1654] p-6 pb-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-white/10 rounded-xl">
+                <Layers size={20} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white leading-tight">{title}</h3>
+                <p className="text-white/50 text-xs mt-0.5">Selecione ou cadastre um novo {entityLabel.toLowerCase()}</p>
+              </div>
+            </div>
+            <button onClick={onCancel} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white">
+              <X size={18} />
+            </button>
+          </div>
+          {/* Mode Tabs */}
+          <div className="flex bg-white/10 p-1 rounded-xl mt-4 gap-1">
+            <button onClick={() => setMode('select')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'select' ? 'bg-white text-[#050a30] shadow-sm' : 'text-white/70 hover:text-white'}`}>
+              Selecionar existente
+            </button>
+            <button onClick={() => setMode('create')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${mode === 'create' ? 'bg-white text-[#050a30] shadow-sm' : 'text-white/70 hover:text-white'}`}>
+              Cadastrar novo
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-5">
+          {mode === 'select' ? (
+            availableOptions && availableOptions.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {/* Search */}
+                <div className="relative">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setSelectedId(''); }}
+                    placeholder={`Pesquisar ${entityLabel.toLowerCase()}...`}
+                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-[#050a30] placeholder-gray-400 focus:outline-none focus:border-[#04a7bd] focus:ring-2 focus:ring-[#04a7bd]/10 transition-all"
+                    autoFocus
+                  />
+                  {search && (
+                    <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Selected badge */}
+                {selectedName && (
+                  <div className="flex items-center gap-2 bg-[#04a7bd]/10 border border-[#04a7bd]/30 px-3 py-2 rounded-xl">
+                    <CheckCircle size={14} className="text-[#04a7bd] shrink-0" />
+                    <span className="text-sm font-semibold text-[#04a7bd] truncate">{selectedName}</span>
+                  </div>
+                )}
+
+                {/* Results count */}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs text-gray-400 font-medium">
+                    {filtered.length === availableOptions.length
+                      ? `${availableOptions.length} ${entityLabel.toLowerCase()}s disponíveis`
+                      : `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''} encontrado${filtered.length !== 1 ? 's' : ''}`}
+                  </span>
+                </div>
+
+                {/* List */}
+                <div className="max-h-52 overflow-y-auto custom-scrollbar flex flex-col gap-1.5 pr-1">
+                  {filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                      <Search size={24} className="mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum resultado para "{search}"</p>
+                    </div>
+                  ) : (
+                    filtered.map((opt: any) => {
+                      const name = opt.nome || opt.nome_unidade;
+                      const isSelected = String(opt.id) === String(selectedId);
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => setSelectedId(String(opt.id))}
+                          className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-150 flex items-center justify-between group ${
+                            isSelected
+                              ? 'bg-[#050a30] border-[#050a30] text-white shadow-md'
+                              : 'bg-white border-gray-100 hover:border-[#04a7bd]/40 hover:bg-[#04a7bd]/5 text-[#050a30]'
+                          }`}
+                        >
+                          <span className={`text-sm font-medium ${isSelected ? 'text-white' : ''}`}>
+                            {isSelected ? name : highlightMatch(name)}
+                          </span>
+                          {isSelected && <Check size={15} className="text-[#04a7bd] shrink-0" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-amber-600 bg-amber-50 rounded-xl border border-amber-100">
+                <AlertTriangle size={28} className="mb-2 opacity-60" />
+                <p className="text-sm font-medium">Não há {entityLabel.toLowerCase()}s disponíveis.</p>
+              </div>
+            )
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-600 ml-1">Nome do {entityLabel}</label>
+              <input
+                type="text"
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                placeholder={`Ex: Novo ${entityLabel}`}
+                autoFocus
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-[#050a30] placeholder-gray-400 focus:outline-none focus:border-[#04a7bd] focus:ring-2 focus:ring-[#04a7bd]/10 transition-all"
+                onKeyDown={(e) => { if (e.key === 'Enter' && newValue.trim()) handleConfirm(); }}
+              />
+              <p className="text-xs text-gray-400 ml-1">Pressione Enter ou clique em Salvar</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 px-5 pb-5">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-gray-100 font-medium text-gray-600 hover:bg-gray-200 transition-colors text-sm">
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={loading || (mode === 'create' && !newValue.trim()) || (mode === 'select' && !selectedId)}
+            className="flex-1 py-3 rounded-xl bg-[#04a7bd] font-medium text-white hover:bg-[#038e9e] transition-colors shadow-lg shadow-[#04a7bd]/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Salvando...</>
+            ) : (
+              <><Check size={15} /> Salvar</>
+            )}
+          </button>
+        </div>
+
       </GlassCard>
     </div>
   );
@@ -1353,6 +1902,145 @@ export default function Dashboard({ session }: DashboardProps) {
   // Progressive Expansion State
   const [selectedUnitNodeId, setSelectedUnitNodeId] = useState<number | null>(null);
   const [selectedSectorNodeId, setSelectedSectorNodeId] = useState<number | null>(null);
+
+  // Collaborators overview modal state
+  const [colabOverviewModal, setColabOverviewModal] = useState<{ isOpen: boolean, loading: boolean, data: { unidade: string, colabs: any[] }[] }>({ isOpen: false, loading: false, data: [] });
+  const [colabOverviewSearch, setColabOverviewSearch] = useState('');
+
+  // Collaborator Edit Modal state
+  const [editColabModal, setEditColabModal] = useState<{
+    isOpen: boolean,
+    loading: boolean,
+    colab: any | null,
+    sectors: { id: number, nome: string }[],
+    cargos: { id: number, nome: string }[],
+    selectedSectorId: string,
+    selectedCargoId: string,
+    saving: boolean
+  }>({
+    isOpen: false,
+    loading: false,
+    colab: null,
+    sectors: [],
+    cargos: [],
+    selectedSectorId: '',
+    selectedCargoId: '',
+    saving: false
+  });
+
+  const openEditColab = async (colab: any) => {
+    if (!hierarchyCompany) return;
+    setEditColabModal(prev => ({
+      ...prev,
+      isOpen: true,
+      loading: true,
+      colab,
+      selectedSectorId: String(colab.setorid || ''),
+      selectedCargoId: String(colab.cargo || ''),
+      cargos: [] // reset cargos until sector is confirmed/loaded
+    }));
+
+    try {
+      // Fetch all sectors linked to THIS company (via unidad_setor -> unidade -> empresaid)
+      const { data: unitSectors, error: unitsErr } = await supabase
+        .from('unidade_setor')
+        .select(`
+          setor:setor ( id, nome ),
+          unidade:unidades!inner ( empresaid )
+        `)
+        .eq('unidade.empresaid', hierarchyCompany.id);
+
+      if (unitsErr) throw unitsErr;
+
+      // Deduplicate sectors by name or just ID
+      const distinctSectorsMap = new Map();
+      (unitSectors || []).forEach((us: any) => {
+        if (us.setor) distinctSectorsMap.set(us.setor.id, us.setor);
+      });
+      const distinctSectors = Array.from(distinctSectorsMap.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+
+      setEditColabModal(prev => ({ ...prev, sectors: distinctSectors }));
+
+      // If there's an existing sector, fetch its cargos immediately
+      if (colab.setorid) {
+        await handleEditSectorChange(String(colab.setorid), true);
+      } else {
+        setEditColabModal(prev => ({ ...prev, loading: false }));
+      }
+    } catch (err) {
+      console.error(err);
+      setEditColabModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleEditSectorChange = async (sectorId: string, isInitial = false) => {
+    if (!isInitial) {
+      setEditColabModal(prev => ({ ...prev, selectedSectorId: sectorId, selectedCargoId: '', cargos: [] }));
+    }
+    if (!sectorId) return;
+
+    try {
+      if (!isInitial) {
+        setEditColabModal(prev => ({ ...prev, loading: true }));
+      }
+
+      // Fetch cargos linked to this sector via cargo_setor
+      const { data: cargoLinks, error: cargoErr } = await supabase
+        .from('cargo_setor')
+        .select(`
+          cargo:cargos ( id, nome )
+        `)
+        .eq('idsetor', sectorId);
+
+      if (cargoErr) throw cargoErr;
+
+      const sectorCargos = (cargoLinks || [])
+        .map((cl: any) => cl.cargo)
+        .filter(Boolean)
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+
+      setEditColabModal(prev => ({
+        ...prev,
+        cargos: sectorCargos,
+        loading: false
+      }));
+    } catch (err) {
+      console.error(err);
+      setEditColabModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleSaveColabEdit = async () => {
+    if (!editColabModal.colab || !editColabModal.selectedSectorId || !editColabModal.selectedCargoId) return;
+
+    setEditColabModal(prev => ({ ...prev, saving: true }));
+    try {
+      const { error } = await supabase
+        .from('colaboradores')
+        .update({
+          setorid: Number(editColabModal.selectedSectorId),
+          cargo: Number(editColabModal.selectedCargoId)
+        })
+        .eq('id', editColabModal.colab.id);
+
+      if (error) throw error;
+
+      // Refresh overview data
+      // We can trigger the floating button's onClick logic again or just manual refresh
+      // For simplicity, let's close both or just update local state if we had it more reactive
+      // Let's just close the edit modal and alert user or refresh
+      setEditColabModal(prev => ({ ...prev, isOpen: false, saving: false }));
+
+      // Refresh the main overview list
+      const event = new MouseEvent('click', { view: window, bubbles: true, cancelable: true });
+      document.querySelector('button[title="Ver todos os colaboradores"]')?.dispatchEvent(event);
+
+    } catch (err: any) {
+      alert("Erro ao salvar: " + err.message);
+      setEditColabModal(prev => ({ ...prev, saving: false }));
+    }
+  };
+
 
   // Drag and Drop state
   const draggedCargoRef = useRef<{ sectorLinkId: number, cargoIndex: number } | null>(null);
@@ -1484,7 +2172,9 @@ export default function Dashboard({ session }: DashboardProps) {
     isOpen: false,
     unitId: 0,
     unitName: '',
-    loading: false
+    loading: false,
+    availableSectors: [] as any[],
+    availableCargos: [] as any[]
   });
 
   // Create User Modal State
@@ -2043,74 +2733,125 @@ export default function Dashboard({ session }: DashboardProps) {
   }, [viewDocsModal.unitId]);
 
   // --- Bulk Upload Logic ---
-  const triggerBulkUpload = useCallback((unitId: number, unitName: string) => {
-    setBulkUploadModal({
-      isOpen: true,
-      unitId: unitId,
-      unitName: unitName,
-      loading: false
-    });
+  const triggerBulkUpload = useCallback(async (unitId: number, unitName: string) => {
+    setBulkUploadModal(prev => ({ ...prev, isOpen: true, unitId, unitName, loading: true }));
+
+    try {
+      const [{ data: sectorsRaw }, { data: cargosRaw }] = await Promise.all([
+        supabase.from('setor').select('id, nome'),
+        supabase.from('cargos').select('id, nome')
+      ]);
+
+      const toTitleCase = (str: string) => {
+        if (!str) return '';
+        const lowercase = str.trim().toLowerCase();
+        return lowercase.charAt(0).toUpperCase() + lowercase.slice(1);
+      };
+
+      const customSort = (aName: string, bName: string) => {
+        const aIsNum = /^\d/.test(aName);
+        const bIsNum = /^\d/.test(bName);
+        if (aIsNum && !bIsNum) return 1;
+        if (!aIsNum && bIsNum) return -1;
+        return aName.localeCompare(bName);
+      };
+
+      // Grouping logic: many IDs with same name -> one option
+      const groupEntities = (raw: any[]) => {
+        const map = new Map<string, any>();
+        (raw || []).forEach(item => {
+          const normalized = toTitleCase(item.nome);
+          if (!map.has(normalized)) {
+            map.set(normalized, { id: item.id, nome: normalized, allIds: [item.id] });
+          } else {
+            map.get(normalized).allIds.push(item.id);
+          }
+        });
+        return Array.from(map.values()).sort((a, b) => customSort(a.nome, b.nome));
+      };
+
+      const sectors = groupEntities(sectorsRaw || []);
+      const cargos = groupEntities(cargosRaw || []);
+
+      setBulkUploadModal({
+        isOpen: true,
+        unitId,
+        unitName,
+        loading: false,
+        availableSectors: sectors,
+        availableCargos: cargos,
+        onRefreshData: () => triggerBulkUpload(unitId, unitName)
+      });
+    } catch (err) {
+      console.error("Erro ao carregar dados globais:", err);
+      setBulkUploadModal(prev => ({ ...prev, loading: false }));
+    }
   }, []);
 
   const handleBulkUploadConfirm = useCallback(async (dataRows: any[]) => {
     if (!dataRows || dataRows.length === 0) return;
     setBulkUploadModal(prev => ({ ...prev, loading: true }));
 
-    const BATCH_SIZE = 20;
-    let successCount = 0;
-    let errorCount = 0;
-    const errorsLog: string[] = [];
+    const toTitleCase = (str: string) => {
+      if (!str) return '';
+      const lowercase = str.trim().toLowerCase();
+      return lowercase.charAt(0).toUpperCase() + lowercase.slice(1);
+    };
 
     try {
-      // Helper to get or create entity
-      const resolveEntityId = async (table: string, name: string) => {
-        if (!name) return null;
-        const normalized = name.trim();
+      // 1. Identify and create missing Sectors
+      const sectorsToCreate = Array.from(new Set(dataRows.filter(r => !r.sectorId && r.excelSectorName).map(r => r.excelSectorName)));
+      const sectorMap = new Map<string, number>();
 
-        // Try to find
-        const { data: found } = await supabase.from(table).select('id').ilike('nome', normalized).maybeSingle();
-        if (found) return found.id;
+      if (sectorsToCreate.length > 0) {
+        const { data: newSectors, error: sErr } = await supabase.from('setor').insert(
+          sectorsToCreate.map(nome => ({ nome: toTitleCase(nome) }))
+        ).select();
 
-        // Create if not found
-        const { data: created } = await supabase.from(table).insert({ nome: normalized, ...(table === 'cargos' ? { ativo: true } : {}) }).select('id').single();
-        return created?.id;
-      };
+        if (sErr) throw new Error("Erro ao criar novos setores: " + sErr.message);
+        newSectors?.forEach(s => sectorMap.set(toTitleCase(s.nome), s.id));
+      }
+
+      // 2. Identify and create missing Cargos
+      const cargosToCreate = Array.from(new Set(dataRows.filter(r => !r.cargoId && r.excelCargoName).map(r => r.excelCargoName)));
+      const cargoMap = new Map<string, number>();
+
+      if (cargosToCreate.length > 0) {
+        const { data: newCargos, error: cErr } = await supabase.from('cargos').insert(
+          cargosToCreate.map(nome => ({ nome: toTitleCase(nome), ativo: true }))
+        ).select();
+
+        if (cErr) throw new Error("Erro ao criar novos cargos: " + cErr.message);
+        newCargos?.forEach(c => cargoMap.set(toTitleCase(c.nome), c.id));
+      }
+
+      // 3. Process records with final IDs
+      const BATCH_SIZE = 20;
+      let successCount = 0;
+      let errorCount = 0;
+      const errorsLog: string[] = [];
 
       for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
         const chunk = dataRows.slice(i, i + BATCH_SIZE);
         const batchPayloads: any[] = [];
         const currentBatchIndex = Math.floor(i / BATCH_SIZE) + 1;
 
-        for (const row of chunk) {
+        for (const rowObj of chunk) {
           try {
-            const nome = row[3]; // Col D
-            const cpfRaw = row[4]; // Col E
-
-            // MAP UPDATED: Cargo is now Column W (22), Setor moved to Column X (23) (swap)
-            const cargoName = row[22]; // Col W (Requested)
-            const setorName = row[23]; // Col X (Swapped)
-            const dataNascimentoRaw = row[47]; // Col AV (47) - Requested
-
-            const sexoRaw = row[46]; // Col AU
+            const { nome, cpf, nascimento, sectorId, cargoId, excelSectorName, excelCargoName } = rowObj;
 
             if (!nome) continue;
 
-            const cpf = cpfRaw ? String(cpfRaw).replace(/\D/g, '') : null;
-            let sexo = 'M';
-            if (sexoRaw && String(sexoRaw).toLowerCase().startsWith('f')) sexo = 'F';
+            const cleanCpf = cpf ? String(cpf).replace(/\D/g, '') : null;
 
-            // Date Parsing Fix
             let dataNascimento = null;
-            if (dataNascimentoRaw) {
-              if (typeof dataNascimentoRaw === 'number') {
-                // Excel serial date
-                const d = new Date(Math.round((dataNascimentoRaw - 25569) * 86400 * 1000));
-                // Adjust to avoid TZ issues near midnight
+            if (nascimento) {
+              if (typeof nascimento === 'number') {
+                const d = new Date(Math.round((nascimento - 25569) * 86400 * 1000));
                 d.setUTCHours(12);
                 dataNascimento = d.toISOString().split('T')[0];
               } else {
-                const strVal = String(dataNascimentoRaw).trim();
-                // Check DD-MM-YYYY or DD/MM/YYYY
+                const strVal = String(nascimento).trim();
                 const parts = strVal.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
                 if (parts) {
                   const d = parts[1].padStart(2, '0');
@@ -2123,20 +2864,19 @@ export default function Dashboard({ session }: DashboardProps) {
               }
             }
 
-            // Resolve IDs
-            const setorId = await resolveEntityId('setor', setorName);
-            const cargoId = await resolveEntityId('cargos', cargoName);
+            // Final ID Resolution
+            const finalSectorId = sectorId ? Number(sectorId) : sectorMap.get(toTitleCase(excelSectorName));
+            const finalCargoId = cargoId ? Number(cargoId) : cargoMap.get(toTitleCase(excelCargoName));
 
-            // Insert Colaborador
             const payload = {
               nome: String(nome).trim(),
-              cpf: cpf,
-              sexo: sexo,
-              data_nascimento: dataNascimento, // New Field
-              setor: setorName ? String(setorName).trim() : null, // String Name (Requested)
-              setorid: setorId, // Integer ID (Requested)
+              cpf: cleanCpf,
+              sexo: 'M',
+              data_nascimento: dataNascimento,
+              setor: excelSectorName ? String(excelSectorName).trim() : null, // Original name for metadata
+              setorid: finalSectorId,
               unidade: bulkUploadModal.unitId,
-              cargo: cargoId, // Relational ID
+              cargo: finalCargoId,
               avulso: false
             };
 
@@ -2149,14 +2889,11 @@ export default function Dashboard({ session }: DashboardProps) {
 
         if (batchPayloads.length > 0) {
           const { error } = await supabase.from('colaboradores').insert(batchPayloads);
-
           if (error) {
             errorCount += batchPayloads.length;
             errorsLog.push(`Erro ao salvar Lote ${currentBatchIndex}: ${error.message}`);
-            console.error(`Erro lote ${currentBatchIndex}:`, error);
           } else {
             successCount += batchPayloads.length;
-            console.log(`Lote ${currentBatchIndex} enviado com sucesso (${batchPayloads.length} itens).`);
           }
         }
       }
@@ -2169,7 +2906,7 @@ export default function Dashboard({ session }: DashboardProps) {
       alert(message);
 
       setBulkUploadModal(prev => ({ ...prev, isOpen: false }));
-      if (hierarchyCompany) openHierarchy(hierarchyCompany); // Refresh
+      if (hierarchyCompany) openHierarchy(hierarchyCompany);
 
     } catch (err: any) {
       console.error("Bulk upload error:", err);
@@ -2539,11 +3276,23 @@ export default function Dashboard({ session }: DashboardProps) {
   const handleSectorSubmit = async (data: { mode: 'create' | 'select', value?: string, id?: string }, unitId: number) => {
     setAddEntityModal(prev => ({ ...prev, loading: true }));
     try {
-      let sectorIdToLink = data.id;
+      let sectorIdToLink: number | string | undefined = data.id;
       if (data.mode === 'create' && data.value) {
-        const { data: sec, error: secErr } = await supabase.from('setor').insert({ nome: data.value }).select().single();
-        if (secErr || !sec) throw new Error('Erro ao criar setor base');
-        sectorIdToLink = sec.id;
+        // Verifica se já existe um setor com o mesmo nome (reutiliza o de menor id)
+        const { data: existing } = await supabase
+          .from('setor')
+          .select('id')
+          .ilike('nome', data.value.trim())
+          .order('id')
+          .limit(1)
+          .maybeSingle();
+        if (existing) {
+          sectorIdToLink = existing.id;
+        } else {
+          const { data: sec, error: secErr } = await supabase.from('setor').insert({ nome: data.value.trim() }).select().single();
+          if (secErr || !sec) throw new Error('Erro ao criar setor base');
+          sectorIdToLink = sec.id;
+        }
       }
       if (!sectorIdToLink) throw new Error('ID do setor inválido');
       const { error: linkErr } = await supabase.from('unidade_setor').insert({ unidade: unitId, setor: Number(sectorIdToLink) });
@@ -2630,7 +3379,26 @@ export default function Dashboard({ session }: DashboardProps) {
   const triggerEditUnit = (u: { id: number, nome_unidade: string }) => { setInputModal({ isOpen: true, title: 'Renomear Unidade', initialValue: u.nome_unidade, placeholder: 'Nome da Unidade', loading: false, onConfirm: (val) => updateUnit(u.id, val) }); };
   const triggerDeleteUnit = (id: number) => { setConfirmModal({ isOpen: true, title: 'Remover Unidade', message: 'Tem certeza que deseja desvincular esta unidade da empresa?', loading: false, onConfirm: () => deleteUnit(id) }); };
   const triggerAddSector = async (unitId: number) => { await fetchAllSectors(); setAddEntityModal({ isOpen: true, title: 'Adicionar Setor', entityLabel: 'Setor', availableOptions: availableSectors, loading: false, onConfirm: (data) => handleSectorSubmit(data, unitId) }); };
-  const triggerAddSectorSafe = async (unitId: number) => { const { data } = await supabase.from('setor').select('*').order('nome'); setAvailableCargos(data || []); setAddEntityModal({ isOpen: true, title: 'Adicionar Setor', entityLabel: 'Setor', availableOptions: data || [], loading: false, onConfirm: (d) => handleSectorSubmit(d, unitId) }); };
+  const triggerAddSectorSafe = async (unitId: number) => {
+    const { data } = await supabase.from('setor').select('*').order('id'); // order by id asc para pegar o menor id por nome
+    // Deduplica por nome (case-insensitive), mantendo apenas o row de menor id
+    const seen = new Map<string, any>();
+    for (const s of (data || [])) {
+      const key = s.nome.trim().toLowerCase();
+      if (!seen.has(key)) seen.set(key, s);
+    }
+    // Normaliza exibição: primeira letra maiúscula, resto minúsculo (não altera o dado enviado ao banco)
+    const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    const deduped = Array.from(seen.values())
+      .map(s => ({ ...s, nome: capitalize(s.nome.trim()) }))
+      .sort((a, b) => {
+        const aIsNum = /^\d/.test(a.nome);
+        const bIsNum = /^\d/.test(b.nome);
+        if (aIsNum !== bIsNum) return aIsNum ? 1 : -1; // numéricos vão pro final
+        return a.nome.localeCompare(b.nome, 'pt-BR');
+      });
+    setAddEntityModal({ isOpen: true, title: 'Adicionar Setor', entityLabel: 'Setor', availableOptions: deduped, loading: false, onConfirm: (d) => handleSectorSubmit(d, unitId) });
+  };
   const triggerEditSector = (s: { id: number, nome: string }) => { setInputModal({ isOpen: true, title: 'Renomear Setor', initialValue: s.nome, placeholder: 'Nome do Setor', loading: false, onConfirm: (val) => updateSector(s.id, val) }); };
   const triggerDeleteSectorLink = (linkId: number) => { setConfirmModal({ isOpen: true, title: 'Remover Setor', message: 'Tem certeza que deseja desvincular este setor da unidade?', loading: false, onConfirm: () => unlinkSector(linkId) }); };
   const triggerAddCargoSafe = async (sectorId: number) => { const { data } = await supabase.from('cargos').select('*').order('nome'); setAvailableCargos(data || []); setAddEntityModal({ isOpen: true, title: 'Adicionar Cargo', entityLabel: 'Cargo', availableOptions: data || [], loading: false, onConfirm: (d) => handleCargoSubmit(d, sectorId) }); };
@@ -2899,6 +3667,336 @@ export default function Dashboard({ session }: DashboardProps) {
                       </div>
                     </div>
                   </div>
+
+                  {/* Floating Button - View All Collaborators */}
+                  <button
+                    onClick={async () => {
+                      if (!hierarchyCompany) return;
+                      setColabOverviewModal({ isOpen: true, loading: true, data: [] });
+                      setColabOverviewSearch('');
+                      try {
+                        // Busca todas as unidades da empresa
+                        const { data: unidades } = await supabase
+                          .from('unidades')
+                          .select('id, nome_unidade')
+                          .eq('empresaid', hierarchyCompany.id)
+                          .order('nome_unidade');
+
+                        if (!unidades || unidades.length === 0) {
+                          setColabOverviewModal({ isOpen: true, loading: false, data: [] });
+                          return;
+                        }
+
+                        const unitIds = unidades.map((u: any) => u.id);
+
+                        // Busca colaboradores ativos nessas unidades
+                        const { data: colabs } = await supabase
+                          .from('colaboradores')
+                          .select('id, nome, cpf, cargo, setorid, unidade, ativo, cargos(nome), setor(nome)')
+                          .in('unidade', unitIds)
+                          .order('nome');
+
+                        // Agrupa por unidade
+                        const grouped = unidades.map((u: any) => ({
+                          unidade: u.nome_unidade || `Unidade ${u.id}`,
+                          colabs: (colabs || []).filter((c: any) => c.unidade === u.id),
+                        })).filter(g => g.colabs.length > 0);
+
+                        setColabOverviewModal({ isOpen: true, loading: false, data: grouped });
+                      } catch (err) {
+                        console.error(err);
+                        setColabOverviewModal({ isOpen: true, loading: false, data: [] });
+                      }
+                    }}
+                    className="absolute bottom-6 right-6 z-30 flex items-center gap-2.5 bg-[#050a30] hover:bg-[#0d1654] text-white px-5 py-3 rounded-2xl shadow-2xl shadow-[#050a30]/30 transition-all duration-200 hover:scale-105 active:scale-95 font-semibold text-sm"
+                    title="Ver todos os colaboradores"
+                  >
+                    <Users size={18} />
+                    <span>Colaboradores</span>
+                  </button>
+
+                  {/* Collaborators Overview Modal */}
+                  {colabOverviewModal.isOpen && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+                      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+
+                        {/* Modal Header */}
+                        <div className="bg-gradient-to-br from-[#050a30] to-[#0d1654] p-6 shrink-0">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 bg-white/10 rounded-xl">
+                                <Users size={20} className="text-white" />
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-bold text-white leading-tight">Colaboradores</h3>
+                                <p className="text-white/50 text-xs mt-0.5">{hierarchyCompany?.nome_fantasia}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setColabOverviewModal({ isOpen: false, loading: false, data: [] })}
+                              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                          {/* Search */}
+                          <div className="relative">
+                            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={colabOverviewSearch}
+                              onChange={(e) => setColabOverviewSearch(e.target.value)}
+                              placeholder="Pesquisar colaborador..."
+                              className="w-full pl-9 pr-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm text-white placeholder-white/40 focus:outline-none focus:border-white/40 transition-all"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                          {colabOverviewModal.loading ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                              <div className="w-10 h-10 border-4 border-[#04a7bd] border-t-transparent rounded-full animate-spin mb-4" />
+                              <p className="text-sm">Carregando colaboradores...</p>
+                            </div>
+                          ) : colabOverviewModal.data.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                              <Users size={40} className="mb-3 opacity-20" />
+                              <p className="text-sm font-medium">Nenhum colaborador encontrado</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {(() => {
+                                const cap = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+                                const searchLower = colabOverviewSearch.toLowerCase();
+                                const filtered = colabOverviewModal.data
+                                  .map(group => {
+                                    const seenNames = new Set<string>();
+                                    const deduped = group.colabs
+                                      .filter((c: any) =>
+                                        !searchLower ||
+                                        (c.nome || '').toLowerCase().includes(searchLower) ||
+                                        (c.cpf || '').includes(searchLower)
+                                      )
+                                      .filter((c: any) => {
+                                        const key = (c.nome || '').trim().toLowerCase();
+                                        if (seenNames.has(key)) return false;
+                                        seenNames.add(key);
+                                        return true;
+                                      })
+                                      .map((c: any) => ({ ...c, _nomeDisplay: cap((c.nome || '').trim()) }));
+                                    return { ...group, colabs: deduped };
+                                  })
+                                  .filter(g => g.colabs.length > 0);
+
+                                const totalColabs = filtered.reduce((acc, g) => acc + g.colabs.length, 0);
+
+                                return (
+                                  <>
+                                    <div className="flex items-center justify-between px-1 mb-2">
+                                      <span className="text-xs text-gray-400 font-medium">
+                                        {totalColabs} colaborador{totalColabs !== 1 ? 'es' : ''} em {filtered.length} unidade{filtered.length !== 1 ? 's' : ''}
+                                      </span>
+                                    </div>
+                                    {filtered.map((group, gIdx) => (
+                                      <div key={gIdx} className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                                        {/* Unit Header */}
+                                        <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
+                                          <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-[#149890]/10 rounded-lg">
+                                              <MapPin size={13} className="text-[#149890]" />
+                                            </div>
+                                            <span className="text-sm font-bold text-[#050a30]">{group.unidade}</span>
+                                          </div>
+                                          <span className="text-xs font-bold bg-[#050a30]/10 text-[#050a30] px-2.5 py-1 rounded-full">
+                                            {group.colabs.length}
+                                          </span>
+                                        </div>
+                                        {/* Colabs List */}
+                                        <div className="divide-y divide-gray-100">
+                                          {group.colabs.map((colab: any) => (
+                                            <div key={colab.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white transition-colors">
+                                              <div className="w-8 h-8 rounded-full bg-[#04a7bd]/10 flex items-center justify-center text-[#04a7bd] shrink-0">
+                                                <User size={14} />
+                                              </div>
+                                              <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-semibold text-[#050a30] truncate">{colab._nomeDisplay || '—'}</p>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                  {colab.cargos?.nome && (
+                                                    <span className="text-[10px] text-gray-500 truncate">{colab.cargos.nome}</span>
+                                                  )}
+                                                  {colab.setor?.nome && (
+                                                    <>
+                                                      <span className="text-gray-300">·</span>
+                                                      <span className="text-[10px] text-gray-400 truncate">{colab.setor.nome}</span>
+                                                    </>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <div className="flex items-center gap-2">
+                                                  <button
+                                                    onClick={() => openEditColab(colab)}
+                                                    className="p-1.5 text-gray-400 hover:text-[#04a7bd] hover:bg-[#04a7bd]/5 rounded-lg transition-all"
+                                                    title="Editar setor e cargo"
+                                                  >
+                                                    <Pencil size={14} />
+                                                  </button>
+                                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                    colab.ativo === 'ativo'
+                                                      ? 'bg-green-50 text-green-600'
+                                                      : 'bg-red-50 text-red-500'
+                                                  }`}>
+                                                    {colab.ativo === 'ativo' ? 'Ativo' : 'Inativo'}
+                                                  </span>
+                                                </div>
+                                                {colab.cpf && (
+                                                  <span className="text-[10px] text-gray-400 font-mono">{colab.cpf}</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="px-6 py-4 border-t border-gray-100 shrink-0">
+                          <button
+                            onClick={() => setColabOverviewModal({ isOpen: false, loading: false, data: [] })}
+                            className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 font-medium hover:bg-gray-200 transition-colors text-sm"
+                          >
+                            Fechar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Edit Collaborator Modal (Sector & Cargo) */}
+                  {editColabModal.isOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300 p-4">
+                      <div className="w-full max-w-md bg-white rounded-[32px] shadow-2xl overflow-hidden flex flex-col border border-white/20">
+
+                        {/* Header */}
+                        <div className="bg-gradient-to-br from-[#050a30] to-[#0d1654] p-8 shrink-0 relative overflow-hidden">
+                          {/* Decorative elements */}
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl font-mono"></div>
+                          <div className="absolute bottom-0 left-0 w-24 h-24 bg-[#04a7bd]/10 rounded-full -ml-12 -mb-12 blur-xl"></div>
+
+                          <div className="flex items-start justify-between relative z-10">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-white/10 backdrop-blur-lg rounded-2xl flex items-center justify-center border border-white/20 shadow-inner">
+                                <User size={24} className="text-[#04a7bd]" />
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-black text-white tracking-tight">Editar Vínculo</h3>
+                                <p className="text-white/50 text-xs font-medium uppercase tracking-wider mt-0.5">{editColabModal.colab?._nomeDisplay}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setEditColabModal(prev => ({ ...prev, isOpen: false }))}
+                              className="p-2 hover:bg-white/10 rounded-xl transition-all duration-200 text-white/40 hover:text-white"
+                            >
+                              <X size={20} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-8 space-y-6">
+                          {editColabModal.loading && !editColabModal.saving ? (
+                            <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                              <div className="w-10 h-10 border-4 border-[#04a7bd] border-t-transparent rounded-full animate-spin mb-4" />
+                              <p className="text-sm font-medium">Carregando opções...</p>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Sector Selection */}
+                              <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Setor</label>
+                                <div className="relative group">
+                                  <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 ${editColabModal.selectedSectorId ? 'text-[#04a7bd]' : 'text-gray-400'}`}>
+                                    <MapPin size={18} />
+                                  </div>
+                                  <select
+                                    value={editColabModal.selectedSectorId}
+                                    onChange={(e) => handleEditSectorChange(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border-2 border-gray-100 rounded-2xl text-sm font-semibold text-[#050a30] focus:outline-none focus:border-[#04a7bd]/30 focus:bg-white transition-all appearance-none cursor-pointer group-hover:border-gray-200"
+                                  >
+                                    <option value="" disabled>Selecione o setor...</option>
+                                    {editColabModal.sectors.map(s => (
+                                      <option key={s.id} value={s.id}>{s.nome}</option>
+                                    ))}
+                                  </select>
+                                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors">
+                                    <ChevronDown size={18} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Cargo Selection */}
+                              <div className={`space-y-2 transition-all duration-300 ${!editColabModal.selectedSectorId ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100'}`}>
+                                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">Cargo</label>
+                                <div className="relative group">
+                                  <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-200 ${editColabModal.selectedCargoId ? 'text-[#04a7bd]' : 'text-gray-400'}`}>
+                                    <Briefcase size={18} />
+                                  </div>
+                                  <select
+                                    value={editColabModal.selectedCargoId}
+                                    onChange={(e) => setEditColabModal(prev => ({ ...prev, selectedCargoId: e.target.value }))}
+                                    disabled={!editColabModal.selectedSectorId}
+                                    className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border-2 border-gray-100 rounded-2xl text-sm font-semibold text-[#050a30] focus:outline-none focus:border-[#04a7bd]/30 focus:bg-white transition-all appearance-none cursor-pointer group-hover:border-gray-200 disabled:cursor-not-allowed"
+                                  >
+                                    <option value="" disabled>{editColabModal.loading ? 'Carregando cargos...' : 'Selecione o cargo...'}</option>
+                                    {editColabModal.cargos.length === 0 && editColabModal.selectedSectorId && !editColabModal.loading && (
+                                      <option value="" disabled>Nenhum cargo vinculado a este setor</option>
+                                    )}
+                                    {editColabModal.cargos.map(c => (
+                                      <option key={c.id} value={c.id}>{c.nome}</option>
+                                    ))}
+                                  </select>
+                                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-hover:text-gray-600 transition-colors">
+                                    <ChevronDown size={18} />
+                                  </div>
+                                </div>
+                                {!editColabModal.selectedSectorId && (
+                                  <p className="text-[10px] text-amber-600 font-medium ml-1">Selecione primeiro o setor</p>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-8 pt-2 border-none">
+                          <button
+                            onClick={handleSaveColabEdit}
+                            disabled={editColabModal.saving || !editColabModal.selectedSectorId || !editColabModal.selectedCargoId}
+                            className="w-full py-4 rounded-[20px] bg-gradient-to-r from-[#04a7bd] to-[#149890] font-bold text-white hover:shadow-xl hover:shadow-[#04a7bd]/30 transition-all duration-300 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-base shadow-lg shadow-[#04a7bd]/10"
+                          >
+                            {editColabModal.saving ? (
+                              <>
+                                <div className="w-5 h-5 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Salvando alterações...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check size={20} />
+                                <span>Atualizar Colaborador</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 // --- STANDARD VIEWS ---
@@ -2961,7 +4059,17 @@ export default function Dashboard({ session }: DashboardProps) {
       <InputModal isOpen={inputModal.isOpen} title={inputModal.title} initialValue={inputModal.initialValue} placeholder={inputModal.placeholder} onConfirm={inputModal.onConfirm} onCancel={() => setInputModal(prev => ({ ...prev, isOpen: false }))} loading={inputModal.loading} />
       <EditCargoModal isOpen={editCargoModal.isOpen} cargoName={editCargoModal.currentName} cargoDescription={editCargoModal.currentDescription} onConfirm={handleSaveCargoDetails} onCancel={() => setEditCargoModal(prev => ({ ...prev, isOpen: false }))} loading={editCargoModal.loading} />
       <UnitDocsModal isOpen={viewDocsModal.isOpen} unitName={viewDocsModal.unitName} unitId={viewDocsModal.unitId} docs={viewDocsModal.docs} onClose={() => setViewDocsModal(prev => ({ ...prev, isOpen: false }))} onUpdate={refreshDocs} loading={viewDocsModal.loading} />
-      <BulkUploadModal isOpen={bulkUploadModal.isOpen} unitId={bulkUploadModal.unitId} unitName={bulkUploadModal.unitName} onClose={() => setBulkUploadModal(prev => ({ ...prev, isOpen: false }))} onConfirm={handleBulkUploadConfirm} loading={bulkUploadModal.loading} />
+      <BulkUploadModal
+        isOpen={bulkUploadModal.isOpen}
+        unitId={bulkUploadModal.unitId}
+        unitName={bulkUploadModal.unitName}
+        onClose={() => setBulkUploadModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={handleBulkUploadConfirm}
+        loading={bulkUploadModal.loading}
+        availableSectors={bulkUploadModal.availableSectors}
+        availableCargos={bulkUploadModal.availableCargos}
+        onRefreshData={() => triggerBulkUpload(bulkUploadModal.unitId, bulkUploadModal.unitName)}
+      />
       <CreateUserModal isOpen={createUserModal.isOpen} company={createUserModal.company} onClose={() => setCreateUserModal(prev => ({ ...prev, isOpen: false }))} loading={createUserModal.loading} />
       <AddEntityModal isOpen={addEntityModal.isOpen} title={addEntityModal.title} entityLabel={addEntityModal.entityLabel} availableOptions={addEntityModal.availableOptions} onConfirm={addEntityModal.onConfirm} onCancel={() => setAddEntityModal(prev => ({ ...prev, isOpen: false }))} loading={addEntityModal.loading} />
       <PeriodicityModal isOpen={periodicityModal.isOpen} targetName={periodicityModal.targetName} currentPeriodicity={periodicityModal.currentPeriodicity} onConfirm={handleSavePeriodicity} onCancel={() => setPeriodicityModal(prev => ({ ...prev, isOpen: false }))} loading={periodicityModal.loading} />
