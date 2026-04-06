@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import ClientDashboard from './components/ClientDashboard';
 import FirstAccess from './components/FirstAccess';
 import { Layout } from './components/ui/GlassComponents';
+import { Toaster } from './components/ui/toaster';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -27,7 +28,7 @@ export default function App() {
     const fetchUserProfile = async (userId: string) => {
       try {
         // Create a promise that rejects in 5 seconds
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Request timed out')), 5000)
         );
 
@@ -40,12 +41,12 @@ export default function App() {
         // Race between fetch and timeout
         // @ts-ignore
         const result: any = await Promise.race([fetchPromise, timeoutPromise]);
-        
+
         const { data, error } = result;
-        
+
         if (error) {
-           console.warn("User profile fetch error:", error.message);
-           return; 
+          console.warn("User profile fetch error:", error.message);
+          return;
         }
 
         if (mounted && data) {
@@ -61,15 +62,15 @@ export default function App() {
     const initAuth = async () => {
       try {
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        
+
         if (error) throw error;
 
         if (mounted) {
-           if (initialSession) {
-             setSession(initialSession);
-             // Don't await strictly to prevent UI blocking, allow parallel fetch
-             await fetchUserProfile(initialSession.user.id);
-           }
+          if (initialSession) {
+            setSession(initialSession);
+            // Don't await strictly to prevent UI blocking, allow parallel fetch
+            await fetchUserProfile(initialSession.user.id);
+          }
         }
       } catch (err) {
         console.error("Auth initialization error:", err);
@@ -79,7 +80,6 @@ export default function App() {
     };
 
     initAuth();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -89,13 +89,13 @@ export default function App() {
 
       if (currentSession) {
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-             await fetchUserProfile(currentSession.user.id);
+          await fetchUserProfile(currentSession.user.id);
         }
       } else {
         setUserRole(null);
         setIsFirstAccess(false);
       }
-      
+
       setLoading(false);
     });
 
@@ -118,29 +118,26 @@ export default function App() {
   }
 
   // Render Logic:
-  
+  let content;
+
   if (!session) {
-    return (
-      <Layout>
-        <Login />
-      </Layout>
-    );
+    content = <Login />;
+  } else if (isFirstAccess) {
+    content = <FirstAccess session={session} />;
+  } else if (userRole === 999) {
+    content = <ClientDashboard session={session} />;
+  } else {
+    content = <Dashboard session={session} />;
   }
 
-  // 1. Check First Access Priority
-  if (isFirstAccess) {
-    return (
-      <Layout>
-        <FirstAccess session={session} />
-      </Layout>
-    );
-  }
-
-  // 2. ClientDashboard handles its own Layout (Full Screen Sidebar) - NO WRAPPER
-  if (userRole === 999) {
-    return <ClientDashboard session={session} />;
-  }
-
-  // 3. Admin Dashboard (Operator) handles its own Layout now too
-  return <Dashboard session={session} />;
+  return (
+    <>
+      {userRole === 999 || (session && !isFirstAccess) ? (
+        content
+      ) : (
+        <Layout>{content}</Layout>
+      )}
+      <Toaster />
+    </>
+  );
 }

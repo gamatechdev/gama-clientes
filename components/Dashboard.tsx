@@ -4,9 +4,16 @@ import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { Session } from '@supabase/supabase-js';
 import { GlassCard, Button, Input, PageTitle } from './ui/GlassComponents';
+import { NotifyList } from './local/structure/NotifyList';
+import { Spinner } from './ui/Spinner';
+import { CompanyList } from './local/structure/CompanyList';
+import { CompanySearch } from './local/structure/CompanySearch';
 import { Cliente, Unidade, Setor, Cargo, LinkedCargo, LinkedSetor, HierarchyUnit, Exame, UserProfile } from '../types';
 import { Building2, MapPin, Plus, ArrowLeft, ChevronLeft, Search, LogOut, Briefcase, Layers, Link as LinkIcon, UserCog, Trash2, Network, X, Edit2, AlertTriangle, ChevronDown, Activity, Save, FileText, FolderOpen, Download, ExternalLink, Calendar, CheckCircle, Clock, UploadCloud, Link, UserPlus, Mail, Lock, Camera, LayoutDashboard, PieChart, Users, Menu, ChevronRight, BarChart3, TrendingUp, AlertCircle, ArrowUpRight, Move, User, History, Printer, ShieldAlert, Check, Stethoscope, ArrowRight, Copy, ZoomIn, ZoomOut, Maximize, ChevronsLeft, ChevronsRight, Upload, Pencil, PlusCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
+// Importação da lista consolidada de exames disponível no catálogo local
+import { EXAMES_LIST_EXPORT } from './local/exame_lists/exame_list';
+import { toast } from '../utils/toast';
 
 interface DashboardProps {
   session: Session;
@@ -834,25 +841,25 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
                     {sectorMode === 'select' ? (
                       <div className="relative">
                         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-                        <input 
-                          type="text" 
-                          value={sectorSearch} 
-                          onChange={(e) => setSectorSearch(e.target.value)} 
-                          placeholder="Pesquisar setor por nome..." 
-                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
-                          autoFocus 
+                        <input
+                          type="text"
+                          value={sectorSearch}
+                          onChange={(e) => setSectorSearch(e.target.value)}
+                          placeholder="Pesquisar setor por nome..."
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono"
+                          autoFocus
                         />
                       </div>
                     ) : (
                       <div className="relative">
                         <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-                        <input 
-                          type="text" 
-                          value={newSectorName} 
-                          onChange={(e) => setNewSectorName(e.target.value)} 
-                          placeholder="Nome do novo setor..." 
-                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
-                          autoFocus 
+                        <input
+                          type="text"
+                          value={newSectorName}
+                          onChange={(e) => setNewSectorName(e.target.value)}
+                          placeholder="Nome do novo setor..."
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono"
+                          autoFocus
                         />
                       </div>
                     )}
@@ -863,19 +870,19 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
                         {(availableSectors || [])
                           .filter(s => s.nome.toLowerCase().includes(sectorSearch.toLowerCase()))
                           .map(sector => (
-                          <button key={sector.id} onClick={() => { updateRow(editingSectorIdx, 'sectorId', String(sector.id)); setEditingSectorIdx(null); }} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left bg-white shadow-sm hover:border-[#04a7bd] hover:shadow-md ${String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) ? 'border-[#04a7bd] bg-[#04a7bd]/5' : 'border-transparent'}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) ? 'bg-[#04a7bd] text-white' : 'bg-gray-100 text-gray-400 font-bold'}`}><MapPin size={18} /></div>
-                              <span className="text-sm font-black text-[#050a30]">{highlightMatch(sector.nome, sectorSearch)}</span>
-                            </div>
-                            {String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) && <CheckCircle size={20} className="text-[#04a7bd]" />}
-                          </button>
-                        ))}
+                            <button key={sector.id} onClick={() => { updateRow(editingSectorIdx, 'sectorId', String(sector.id)); setEditingSectorIdx(null); }} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left bg-white shadow-sm hover:border-[#04a7bd] hover:shadow-md ${String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) ? 'border-[#04a7bd] bg-[#04a7bd]/5' : 'border-transparent'}`}>
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) ? 'bg-[#04a7bd] text-white' : 'bg-gray-100 text-gray-400 font-bold'}`}><MapPin size={18} /></div>
+                                <span className="text-sm font-black text-[#050a30]">{highlightMatch(sector.nome, sectorSearch)}</span>
+                              </div>
+                              {String(previewData.find(r => r.id === editingSectorIdx)?.sectorId) === String(sector.id) && <CheckCircle size={20} className="text-[#04a7bd]" />}
+                            </button>
+                          ))}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center gap-4 py-6">
                         <p className="text-[#050a30] font-bold text-center">Cadastrar "{newSectorName || '...'}" como novo setor?</p>
-                        <button 
+                        <button
                           onClick={handleCreateNewSector}
                           disabled={savingEntity || !newSectorName.trim()}
                           className="px-8 py-3 bg-[#04a7bd] text-white rounded-xl font-bold shadow-lg shadow-[#04a7bd]/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
@@ -912,25 +919,25 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
                     {cargoMode === 'select' ? (
                       <div className="relative">
                         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-                        <input 
-                          type="text" 
-                          value={cargoSearch} 
-                          onChange={(e) => setCargoSearch(e.target.value)} 
-                          placeholder="Pesquisar cargo por nome..." 
-                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
-                          autoFocus 
+                        <input
+                          type="text"
+                          value={cargoSearch}
+                          onChange={(e) => setCargoSearch(e.target.value)}
+                          placeholder="Pesquisar cargo por nome..."
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono"
+                          autoFocus
                         />
                       </div>
                     ) : (
                       <div className="relative">
                         <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-                        <input 
-                          type="text" 
-                          value={newCargoName} 
-                          onChange={(e) => setNewCargoName(e.target.value)} 
-                          placeholder="Nome do novo cargo..." 
-                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono" 
-                          autoFocus 
+                        <input
+                          type="text"
+                          value={newCargoName}
+                          onChange={(e) => setNewCargoName(e.target.value)}
+                          placeholder="Nome do novo cargo..."
+                          className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/10 rounded-2xl text-base placeholder-white/30 focus:outline-none focus:bg-white/20 transition-all font-mono"
+                          autoFocus
                         />
                       </div>
                     )}
@@ -941,19 +948,19 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
                         {(availableCargos || [])
                           .filter(c => c.nome.toLowerCase().includes(cargoSearch.toLowerCase()))
                           .map(cargo => (
-                          <button key={cargo.id} onClick={() => { updateRow(editingCargoIdx, 'cargoId', String(cargo.id)); setEditingCargoIdx(null); }} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left bg-white shadow-sm hover:border-[#04a7bd] hover:shadow-md ${String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) ? 'border-[#04a7bd] bg-[#04a7bd]/5' : 'border-transparent'}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) ? 'bg-[#04a7bd] text-white' : 'bg-gray-100 text-gray-400 font-bold'}`}><Briefcase size={18} /></div>
-                              <span className="text-sm font-black text-[#050a30]">{highlightMatch(cargo.nome, cargoSearch)}</span>
-                            </div>
-                            {String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) && <CheckCircle size={20} className="text-[#04a7bd]" />}
-                          </button>
-                        ))}
+                            <button key={cargo.id} onClick={() => { updateRow(editingCargoIdx, 'cargoId', String(cargo.id)); setEditingCargoIdx(null); }} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left bg-white shadow-sm hover:border-[#04a7bd] hover:shadow-md ${String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) ? 'border-[#04a7bd] bg-[#04a7bd]/5' : 'border-transparent'}`}>
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) ? 'bg-[#04a7bd] text-white' : 'bg-gray-100 text-gray-400 font-bold'}`}><Briefcase size={18} /></div>
+                                <span className="text-sm font-black text-[#050a30]">{highlightMatch(cargo.nome, cargoSearch)}</span>
+                              </div>
+                              {String(previewData.find(r => r.id === editingCargoIdx)?.cargoId) === String(cargo.id) && <CheckCircle size={20} className="text-[#04a7bd]" />}
+                            </button>
+                          ))}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center gap-4 py-6">
                         <p className="text-[#050a30] font-bold text-center">Cadastrar "{newCargoName || '...'}" como novo cargo?</p>
-                        <button 
+                        <button
                           onClick={handleCreateNewCargo}
                           disabled={savingEntity || !newCargoName.trim()}
                           className="px-8 py-3 bg-[#04a7bd] text-white rounded-xl font-bold shadow-lg shadow-[#04a7bd]/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
@@ -970,20 +977,20 @@ const BulkUploadModal = ({ isOpen, unitId, unitName, onClose, onConfirm, loading
         )}
 
         <div className="flex gap-3 mt-4">
-            <button
-              onClick={handleConfirm}
-              disabled={loading || previewData.length === 0}
-              className="flex-1 py-3 bg-[#04a7bd] text-white rounded-xl font-bold hover:bg-[#038e9e] transition-all shadow-lg shadow-[#04a7bd]/20 disabled:opacity-50"
-            >
-              {loading ? 'Processando...' : 'Confirmar Importação'}
-            </button>
-            <button
-              onClick={onClose}
-              className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
-            >
-              Cancelar
-            </button>
-          </div>
+          <button
+            onClick={handleConfirm}
+            disabled={loading || previewData.length === 0}
+            className="flex-1 py-3 bg-[#04a7bd] text-white rounded-xl font-bold hover:bg-[#038e9e] transition-all shadow-lg shadow-[#04a7bd]/20 disabled:opacity-50"
+          >
+            {loading ? 'Processando...' : 'Confirmar Importação'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
+          >
+            Cancelar
+          </button>
+        </div>
       </GlassCard>
     </div>
   );
@@ -1080,7 +1087,7 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   const [assignedExams, setAssignedExams] = useState<ExameUnidadeItem[]>([]);
   const [globalExams, setGlobalExams] = useState<Exame[]>([]);
   const [configExam, setConfigExam] = useState<{ id?: number, nome: string, isNew?: boolean }>({ nome: '' });
-  const [formFlags, setFormFlags] = useState({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false });
+  const [formFlags, setFormFlags] = useState<{ periodicidade: number | string, admissao: boolean, demissao: boolean, ret_trabalho: boolean, mud_riscos: boolean }>({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false });
   const [sourceSectors, setSourceSectors] = useState<any[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1094,29 +1101,384 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   const handleSelectExam = (exame: Exame) => { setConfigExam({ id: exame.id, nome: exame.nome, isNew: false }); setFormFlags({ periodicidade: exame.periodicidade || 12, admissao: !!exame.admissao, demissao: !!exame.demissao, ret_trabalho: !!exame.ret_trabalho, mud_riscos: !!exame.mud_riscos }); setEditingLinkId(null); setView('config'); };
   const handleEditAssignment = (item: ExameUnidadeItem) => { setConfigExam({ id: item.exame_id, nome: item.exames?.nome || '', isNew: false }); setFormFlags({ periodicidade: item.periodicidade, admissao: item.admissao, demissao: item.demissao, ret_trabalho: item.ret_trabalho, mud_riscos: item.mud_riscos }); setEditingLinkId(item.id); setView('config'); };
   const handleCreateNew = () => { setConfigExam({ nome: searchTerm, isNew: true }); setFormFlags({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false }); setEditingLinkId(null); setView('config'); };
-  const handleDeleteAssignment = async (id: number) => { if (!confirm("Remover este exame do setor?")) return; const { error } = await supabase.from('exames_unidade').delete().eq('id', id); if (!error) { fetchAssignedExams(); } else { alert("Erro ao remover."); } };
-  const handleSaveConfiguration = async () => { setSaving(true); try { let finalExameId = configExam.id; if (configExam.isNew) { const { data: newExame, error: createError } = await supabase.from('exames').insert({ nome: configExam.nome, periodicidade: formFlags.periodicidade }).select().single(); if (createError) throw createError; finalExameId = newExame.id; } if (!finalExameId) throw new Error("ID do exame inválido"); if (editingLinkId) { const { error: updateError } = await supabase.from('exames_unidade').update({ periodicidade: formFlags.periodicidade, admissao: formFlags.admissao, demissao: formFlags.demissao, ret_trabalho: formFlags.ret_trabalho, mud_riscos: formFlags.mud_riscos }).eq('id', editingLinkId); if (updateError) throw updateError; } else { const { error: linkError } = await supabase.from('exames_unidade').insert({ unidade_setor: sectorLinkId, exame_id: finalExameId, periodicidade: formFlags.periodicidade, admissao: formFlags.admissao, demissao: formFlags.demissao, ret_trabalho: formFlags.ret_trabalho, mud_riscos: formFlags.mud_riscos }); if (linkError) throw linkError; } setView('list'); setEditingLinkId(null); fetchAssignedExams(); setSearchTerm(''); } catch (err: any) { console.error(err); alert("Erro ao salvar exame: " + err.message); } finally { setSaving(false); } };
-  const handlePrepareCopy = async () => { setLoading(true); try { const { data: currentLink } = await supabase.from('unidade_setor').select('unidade:unidades(empresaid)').eq('id', sectorLinkId).single(); const companyId = (currentLink as any)?.unidade?.empresaid; if (!companyId) throw new Error("Empresa não identificada."); const { data: sectors } = await supabase.from('unidade_setor').select(`id, setor ( nome ), unidade!inner ( id, nome_unidade, empresaid )`).eq('unidade.empresaid', companyId).neq('id', sectorLinkId); if (sectors) { const formatted = sectors.map((s: any) => ({ id: s.id, label: `${s.unidade.nome_unidade} > ${s.setor.nome}` })).sort((a, b) => a.label.localeCompare(b.label)); setSourceSectors(formatted); } setSelectedSourceId(''); setView('copy'); } catch (err: any) { alert("Erro ao carregar setores: " + err.message); } finally { setLoading(false); } };
-  const handleCopyExams = async () => { if (!selectedSourceId) return; setSaving(true); try { const { data: sourceExams } = await supabase.from('exames_unidade').select('*').eq('unidade_setor', selectedSourceId); if (!sourceExams || sourceExams.length === 0) { alert("O setor selecionado não possui exames cadastrados."); setSaving(false); return; } const currentExamIds = assignedExams.map(ae => ae.exame_id); const examsToCopy = sourceExams.filter(se => !currentExamIds.includes(se.exame_id)).map(se => ({ unidade_setor: sectorLinkId, exame_id: se.exame_id, periodicidade: se.periodicidade, admissao: se.admissao, demissao: se.demissao, ret_trabalho: se.ret_trabalho, mud_riscos: se.mud_riscos })); if (examsToCopy.length === 0) { alert("Todos os exames do setor de origem já estão cadastrados neste setor."); setSaving(false); return; } const { error } = await supabase.from('exames_unidade').insert(examsToCopy); if (error) throw error; alert(`${examsToCopy.length} exames copiados com sucesso!`); setView('list'); fetchAssignedExams(); } catch (err: any) { console.error(err); alert("Erro ao copiar exames: " + err.message); } finally { setSaving(false); } };
+  const handleDeleteAssignment = async (id: number) => { 
+    if (!confirm("Remover este exame do setor?")) return; 
+    const { error } = await supabase.from('exames_unidade').delete().eq('id', id); 
+    if (!error) { 
+      toast.success({ title: "Removido", description: "Exame removido do setor com sucesso." });
+      fetchAssignedExams(); 
+    } else { 
+      toast.error({ title: "Erro na remoção", description: "Ocorreu uma falha ao tentar remover o exame." });
+    } 
+  };
+
+  const handleSaveConfiguration = async () => { 
+    const periodicidadeNum = Number(formFlags.periodicidade);
+
+    // Validação de Periodicidade
+    if (isNaN(periodicidadeNum) || periodicidadeNum <= 0) {
+      toast.error({ 
+        title: "Dados Inválidos", 
+        description: "A periodicidade do exame deve ser um número maior que 0 meses." 
+      });
+      return;
+    }
+
+    // Validação de Aplicabilidade (Pelo menos uma checkbox deve estar ativa)
+    const hasAnyFlag = formFlags.admissao || formFlags.demissao || formFlags.ret_trabalho || formFlags.mud_riscos;
+    if (!hasAnyFlag) {
+      toast.error({ 
+        title: "Seleção Obrigatória", 
+        description: "Selecione pelo menos uma aplicabilidade (Admissional, Demissional, etc.) para este exame." 
+      });
+      return;
+    }
+
+    setSaving(true); 
+    try { 
+      let finalExameId = configExam.id; 
+      
+      // Se for um novo exame sendo criado no catálogo global
+      if (configExam.isNew) { 
+        const { data: newExame, error: createError } = await supabase
+          .from('exames')
+          .insert({ 
+            nome: configExam.nome, 
+            periodicidade: periodicidadeNum 
+          })
+          .select()
+          .single(); 
+          
+        if (createError) throw createError; 
+        finalExameId = newExame.id; 
+      } 
+
+      if (!finalExameId) throw new Error("ID do exame inválido"); 
+      
+      // Payload comum para vínculo de exame ao setor - Garantindo Booleanos explícitos
+      const assignmentPayload = {
+        periodicidade: periodicidadeNum,
+        admissao: !!formFlags.admissao,
+        demissao: !!formFlags.demissao,
+        ret_trabalho: !!formFlags.ret_trabalho,
+        mud_riscos: !!formFlags.mud_riscos
+      };
+
+      if (editingLinkId) { 
+        // Atualiza vínculo existente
+        const { error: updateError } = await supabase
+          .from('exames_unidade')
+          .update(assignmentPayload)
+          .eq('id', editingLinkId);
+          
+        if (updateError) throw updateError; 
+      } else { 
+        // Cria novo vínculo no setor
+        const { error: linkError } = await supabase
+          .from('exames_unidade')
+          .insert({ 
+            unidade_setor: sectorLinkId, 
+            exame_id: finalExameId, 
+            ...assignmentPayload 
+          });
+          
+        if (linkError) throw linkError; 
+      } 
+      
+      toast.success({ 
+        title: editingLinkId ? "Atualizado" : "Vinculado", 
+        description: "Configurações do exame salvas com sucesso." 
+      });
+
+      setView('list'); 
+      setEditingLinkId(null); 
+      fetchAssignedExams(); 
+      setSearchTerm(''); 
+    } catch (err: any) { 
+      console.error(err); 
+      toast.error({ 
+        title: "Erro ao salvar", 
+        description: err.message 
+      });
+    } finally { 
+      setSaving(false); 
+    } 
+  };
+
+  const handlePrepareCopy = async () => { 
+    setLoading(true); 
+    try { 
+      const { data: currentLink } = await supabase.from('unidade_setor').select('unidade:unidades(empresaid)').eq('id', sectorLinkId).single(); 
+      const companyId = (currentLink as any)?.unidade?.empresaid; 
+      if (!companyId) throw new Error("Empresa não identificada."); 
+      const { data: sectors } = await supabase.from('unidade_setor').select(`id, setor ( nome ), unidade!inner ( id, nome_unidade, empresaid )`).eq('unidade.empresaid', companyId).neq('id', sectorLinkId); 
+      if (sectors) { 
+        const formatted = sectors.map((s: any) => ({ id: s.id, label: `${s.unidade.nome_unidade} > ${s.setor.nome}` })).sort((a, b) => a.label.localeCompare(b.label)); 
+        setSourceSectors(formatted); 
+      } 
+      setSelectedSourceId(''); 
+      setView('copy'); 
+    } catch (err: any) { 
+      toast.error({ title: "Erro ao carregar", description: err.message });
+    } finally { 
+      setLoading(false); 
+    } 
+  };
+
+  const handleCopyExams = async () => { 
+    if (!selectedSourceId) return; 
+    setSaving(true); 
+    try { 
+      const { data: sourceExams } = await supabase.from('exames_unidade').select('*').eq('unidade_setor', selectedSourceId); 
+      if (!sourceExams || sourceExams.length === 0) { 
+        toast.warning({ title: "Sem dados", description: "O setor selecionado não possui exames cadastrados." });
+        setSaving(false); 
+        return; 
+      } 
+      const currentExamIds = assignedExams.map(ae => ae.exame_id); 
+      const examsToCopy = sourceExams.filter(se => !currentExamIds.includes(se.exame_id)).map(se => ({ 
+        unidade_setor: sectorLinkId, 
+        exame_id: se.exame_id, 
+        periodicidade: se.periodicidade, 
+        admissao: !!se.admissao, 
+        demissao: !!se.demissao, 
+        ret_trabalho: !!se.ret_trabalho, 
+        mud_riscos: !!se.mud_riscos 
+      })); 
+      if (examsToCopy.length === 0) { 
+        toast.info({ title: "Aviso", description: "Todos os exames do setor de origem já estão cadastrados neste setor." });
+        setSaving(false); 
+        return; 
+      } 
+      const { error } = await supabase.from('exames_unidade').insert(examsToCopy); 
+      if (error) throw error; 
+      toast.success({ title: "Cópia concluída", description: `${examsToCopy.length} exames copiados com sucesso!` });
+      setView('list'); 
+      fetchAssignedExams(); 
+    } catch (err: any) { 
+      console.error(err); 
+      toast.error({ title: "Erro na cópia", description: err.message });
+    } finally { 
+      setSaving(false); 
+    } 
+  };
 
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 p-4">
       <GlassCard className="w-full max-w-2xl bg-white border-none shadow-2xl p-0 overflow-hidden">
         <div className="flex flex-col max-h-[85vh]">
-          {/* ... (Modal content) */}
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-            <div className="flex items-center gap-3"><div className="p-2 bg-blue-100 rounded-lg text-blue-600"><Stethoscope size={24} /></div><div><h3 className="text-xl font-bold text-[#050a30]">{view === 'config' ? 'Configurar Exame' : view === 'copy' ? 'Copiar Exames' : 'Exames do Setor'}</h3><p className="text-sm text-gray-500">{sectorName}</p></div></div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"><X size={24} /></button>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                <Stethoscope size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-[#050a30]">
+                  {view === 'config' ? 'Configurar Exame' : view === 'copy' ? 'Copiar Exames' : 'Exames do Setor'}
+                </h3>
+                <p className="text-sm text-gray-500">{sectorName}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+              <X size={24} />
+            </button>
           </div>
+          
           <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
-            {view === 'list' && (<div className="p-6"><div className="flex justify-between items-center mb-4 gap-2"><h4 className="text-sm font-bold text-gray-500 uppercase">Exames Vinculados</h4><div className="flex gap-2"><Button onClick={handlePrepareCopy} className="h-9 text-xs font-bold !bg-white !text-gray-600 border border-gray-200 !shadow-none hover:!bg-gray-50"><Copy size={14} className="mr-1" /> Copiar de Outro</Button><Button onClick={() => setView('search')} className="h-9 text-xs font-bold !bg-[#04a7bd] hover:!bg-[#038e9e] !shadow-none"><Plus size={14} /> Adicionar Exame</Button></div></div>{loading ? (<div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#04a7bd]"></div></div>) : assignedExams.length === 0 ? (<div className="text-center py-10 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200"><Stethoscope size={32} className="mx-auto mb-2 opacity-30" /><p>Nenhum exame vinculado a este setor.</p></div>) : (<div className="space-y-2">{assignedExams.map(item => (<div key={item.id} className="bg-white border border-gray-100 p-4 rounded-xl flex items-center justify-between shadow-sm"><div><p className="font-bold text-[#050a30]">{item.exames?.nome}</p><div className="flex flex-wrap gap-1 mt-1">{item.admissao && <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px] font-bold">ADM</span>}{item.demissao && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-bold">DEM</span>}{item.ret_trabalho && <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 text-[10px] font-bold">RET</span>}{item.mud_riscos && <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 text-[10px] font-bold">MUD</span>}<span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold">{item.periodicidade} meses</span></div></div><div className="flex gap-1"><button onClick={() => handleEditAssignment(item)} className="p-2 text-amber-400 hover:bg-amber-50 hover:text-amber-600 rounded-lg transition-colors"><Edit2 size={16} /></button><button onClick={() => handleDeleteAssignment(item.id)} className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"><Trash2 size={16} /></button></div></div>))}</div>)}</div>)}
-            {view === 'search' && (<div className="p-6"><div className="mb-4"><Input placeholder="Buscar no catálogo global..." icon={<Search size={18} />} value={searchTerm} onChange={(e) => handleSearchGlobal(e.target.value)} autoFocus /></div><div className="space-y-2">{globalExams.map(ex => (<div key={ex.id} onClick={() => handleSelectExam(ex)} className="p-3 bg-white border border-gray-100 hover:border-[#04a7bd] hover:shadow-sm rounded-xl cursor-pointer transition-all flex justify-between items-center group"><span className="font-medium text-[#050a30] group-hover:text-[#04a7bd]">{ex.nome}</span><ArrowRight size={16} className="text-gray-300 group-hover:text-[#04a7bd]" /></div>))}{searchTerm.length > 1 && globalExams.length === 0 && (<div className="text-center py-8"><p className="text-gray-400 mb-3">Exame não encontrado.</p><Button onClick={handleCreateNew} className="h-9 text-xs mx-auto"><Plus size={14} /> Criar "{searchTerm}"</Button></div>)}</div></div>)}
-            {view === 'config' && (<div className="p-6 space-y-6"><div><label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Nome do Exame</label><input type="text" value={configExam.nome} onChange={(e) => configExam.isNew && setConfigExam({ ...configExam, nome: e.target.value })} disabled={!configExam.isNew} className={`w-full rounded-2xl py-3 px-4 border focus:outline-none ${configExam.isNew ? 'bg-white border-gray-200 focus:border-[#04a7bd]' : 'bg-gray-100 border-transparent text-gray-500 cursor-not-allowed'}`} /></div><div className="flex gap-4"><div className="w-1/2"><label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Periodicidade (meses)</label><input type="number" className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd]" value={formFlags.periodicidade} onChange={(e) => setFormFlags({ ...formFlags, periodicidade: parseInt(e.target.value) || 0 })} /></div></div><div><label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Aplicabilidade neste Setor</label><div className="grid grid-cols-2 gap-3"><label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.admissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}><input type="checkbox" checked={formFlags.admissao} onChange={(e) => setFormFlags({ ...formFlags, admissao: e.target.checked })} className="w-4 h-4 accent-[#04a7bd]" /><span className="text-sm font-medium text-[#050a30]">Admissional</span></label><label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.demissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}><input type="checkbox" checked={formFlags.demissao} onChange={(e) => setFormFlags({ ...formFlags, demissao: e.target.checked })} className="w-4 h-4 accent-[#04a7bd]" /><span className="text-sm font-medium text-[#050a30]">Demissional</span></label><label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.ret_trabalho ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}><input type="checkbox" checked={formFlags.ret_trabalho} onChange={(e) => setFormFlags({ ...formFlags, ret_trabalho: e.target.checked })} className="w-4 h-4 accent-[#04a7bd]" /><span className="text-sm font-medium text-[#050a30]">Retorno ao Trabalho</span></label><label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.mud_riscos ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}><input type="checkbox" checked={formFlags.mud_riscos} onChange={(e) => setFormFlags({ ...formFlags, mud_riscos: e.target.checked })} className="w-4 h-4 accent-[#04a7bd]" /><span className="text-sm font-medium text-[#050a30]">Mudança de Riscos</span></label></div></div></div>)}
-            {view === 'copy' && (<div className="p-6 space-y-6"><div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-700 border border-blue-100 flex gap-2"><Copy size={20} className="shrink-0" /><p>Esta ação irá importar todos os exames do setor selecionado, mantendo a periodicidade e configurações de aplicabilidade (admissional, demissional, etc).</p></div><div><label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Selecione o Setor de Origem</label><div className="relative"><select value={selectedSourceId} onChange={(e) => setSelectedSourceId(e.target.value)} className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd] appearance-none"><option value="">Selecione...</option>{sourceSectors.map((s: any) => (<option key={s.id} value={s.id}>{s.label}</option>))}</select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} /></div></div></div>)}
+            {view === 'list' && (
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4 gap-2">
+                  <h4 className="text-sm font-bold text-gray-500 uppercase">Exames Vinculados</h4>
+                  <div className="flex gap-2">
+                    <Button onClick={handlePrepareCopy} className="h-9 text-xs font-bold !bg-white !text-gray-600 border border-gray-200 !shadow-none hover:!bg-gray-50">
+                      <Copy size={14} className="mr-1" /> Copiar de Outro
+                    </Button>
+                    <Button onClick={() => setView('search')} className="h-9 text-xs font-bold !bg-[#04a7bd] hover:!bg-[#038e9e] !shadow-none">
+                      <Plus size={14} /> Adicionar Exame
+                    </Button>
+                  </div>
+                </div>
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#04a7bd]"></div>
+                  </div>
+                ) : assignedExams.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                    <Stethoscope size={32} className="mx-auto mb-2 opacity-30" />
+                    <p>Nenhum exame vinculado a este setor.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {assignedExams.map(item => (
+                      <div key={item.id} className="bg-white border border-gray-100 p-4 rounded-xl flex items-center justify-between shadow-sm">
+                        <div>
+                          <p className="font-bold text-[#050a30]">{item.exames?.nome}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.admissao && <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[10px] font-bold">ADM</span>}
+                            {item.demissao && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-bold">DEM</span>}
+                            {item.ret_trabalho && <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 text-[10px] font-bold">RET</span>}
+                            {item.mud_riscos && <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 text-[10px] font-bold">MUD</span>}
+                            <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold">{item.periodicidade} meses</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <button onClick={() => handleEditAssignment(item)} className="p-2 text-amber-400 hover:bg-amber-50 hover:text-amber-600 rounded-lg transition-colors">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => handleDeleteAssignment(item.id)} className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {view === 'search' && (
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-sm font-bold text-gray-500 uppercase">Catálogo de Exames</h4>
+                  <span className="text-[10px] font-bold bg-[#04a7bd]/10 text-[#04a7bd] px-2 py-0.5 rounded-full border border-[#04a7bd]/20">
+                    {EXAMES_LIST_EXPORT.length} DISPONÍVEIS
+                  </span>
+                </div>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1 px-2">
+                  {EXAMES_LIST_EXPORT.map(ex => (
+                    <div
+                      key={ex.id}
+                      onClick={() => handleSelectExam(ex as any)}
+                      className="p-3 bg-white border border-gray-100 hover:border-[#04a7bd] hover:shadow-md hover:-translate-x-1 rounded-xl cursor-pointer transition-all flex justify-between items-center group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-50 rounded-lg text-gray-400 group-hover:bg-[#04a7bd]/10 group-hover:text-[#04a7bd] transition-colors">
+                          <Stethoscope size={16} />
+                        </div>
+                        <span className="font-bold text-[#050a30] group-hover:text-[#04a7bd] transition-colors">{ex.nome}</span>
+                      </div>
+                      <ArrowRight size={16} className="text-gray-300 group-hover:text-[#04a7bd] transition-all transform group-hover:translate-x-1" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {view === 'config' && (
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Nome do Exame</label>
+                  <input 
+                    type="text" 
+                    value={configExam.nome} 
+                    onChange={(e) => configExam.isNew && setConfigExam({ ...configExam, nome: e.target.value })} 
+                    disabled={!configExam.isNew} 
+                    className={`w-full rounded-2xl py-3 px-4 border focus:outline-none ${configExam.isNew ? 'bg-white border-gray-200 focus:border-[#04a7bd]' : 'bg-gray-100 border-transparent text-gray-500 cursor-not-allowed'}`} 
+                  />
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="w-1/2">
+                    <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Periodicidade (meses)</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd]" 
+                      value={formFlags.periodicidade} 
+                      onChange={(e) => setFormFlags({ ...formFlags, periodicidade: e.target.value })} 
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Aplicabilidade neste Setor</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.admissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!formFlags.admissao} 
+                        onChange={(e) => setFormFlags({ ...formFlags, admissao: e.target.checked })} 
+                        className="w-4 h-4 accent-[#04a7bd]" 
+                      />
+                      <span className="text-sm font-medium text-[#050a30]">Admissional</span>
+                    </label>
+
+                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.demissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!formFlags.demissao} 
+                        onChange={(e) => setFormFlags({ ...formFlags, demissao: e.target.checked })} 
+                        className="w-4 h-4 accent-[#04a7bd]" 
+                      />
+                      <span className="text-sm font-medium text-[#050a30]">Demissional</span>
+                    </label>
+
+                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.ret_trabalho ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!formFlags.ret_trabalho} 
+                        onChange={(e) => setFormFlags({ ...formFlags, ret_trabalho: e.target.checked })} 
+                        className="w-4 h-4 accent-[#04a7bd]" 
+                      />
+                      <span className="text-sm font-medium text-[#050a30]">Retorno ao Trabalho</span>
+                    </label>
+
+                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.mud_riscos ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                      <input 
+                        type="checkbox" 
+                        checked={!!formFlags.mud_riscos} 
+                        onChange={(e) => setFormFlags({ ...formFlags, mud_riscos: e.target.checked })} 
+                        className="w-4 h-4 accent-[#04a7bd]" 
+                      />
+                      <span className="text-sm font-medium text-[#050a30]">Mudança de Riscos</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {view === 'copy' && (
+              <div className="p-6 space-y-6">
+                <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-700 border border-blue-100 flex gap-2">
+                  <Copy size={20} className="shrink-0" />
+                  <p>Esta ação irá importar todos os exames do setor selecionado, mantendo a periodicidade e configurações de aplicabilidade (admissional, demissional, etc).</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Selecione o Setor de Origem</label>
+                  <div className="relative">
+                    <select 
+                      value={selectedSourceId} 
+                      onChange={(e) => setSelectedSourceId(e.target.value)} 
+                      className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd] appearance-none"
+                    >
+                      <option value="">Selecione...</option>
+                      {sourceSectors.map((s: any) => (<option key={s.id} value={s.id}>{s.label}</option>))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+          
           <div className="p-4 border-t border-gray-100 bg-white flex gap-3 shrink-0">
-            {view === 'list' ? (<Button onClick={onClose} className="w-full bg-gray-100 text-gray-600 hover:bg-gray-200 !shadow-none">Fechar</Button>) : (<><Button onClick={() => { setView('list'); setEditingLinkId(null); }} className="flex-1 bg-gray-100 text-gray-600 hover:bg-gray-200 !shadow-none">Cancelar</Button>{view === 'config' && (<Button onClick={handleSaveConfiguration} disabled={saving} className="flex-1 !bg-[#04a7bd] hover:!bg-[#038e9e] text-white">{saving ? 'Salvando...' : editingLinkId ? 'Salvar Alterações' : 'Incluir Exame'}</Button>)}{view === 'copy' && (<Button onClick={handleCopyExams} disabled={saving || !selectedSourceId} className="flex-1 !bg-[#04a7bd] hover:!bg-[#038e9e] text-white">{saving ? 'Copiando...' : 'Copiar Exames'}</Button>)}</>)}
+            {view === 'list' ? (
+              <Button onClick={onClose} className="w-full bg-gray-100 text-gray-600 hover:bg-gray-200 !shadow-none">Fechar</Button>
+            ) : (
+              <>
+                <Button onClick={() => { setView(view === 'config' && !editingLinkId ? 'search' : 'list'); setEditingLinkId(null); }} className="flex-1 bg-gray-100 text-gray-600 hover:bg-gray-200 !shadow-none">Cancelar</Button>
+                {view === 'config' && (
+                  <Button onClick={handleSaveConfiguration} disabled={saving} className="flex-1 !bg-[#04a7bd] hover:!bg-[#038e9e] text-white">
+                    {saving ? 'Salvando...' : editingLinkId ? 'Salvar Alterações' : 'Incluir Exame'}
+                  </Button>
+                )}
+                {view === 'copy' && (
+                  <Button onClick={handleCopyExams} disabled={saving || !selectedSourceId} className="flex-1 !bg-[#04a7bd] hover:!bg-[#038e9e] text-white">
+                    {saving ? 'Copiando...' : 'Copiar Exames'}
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </GlassCard>
@@ -1765,11 +2127,10 @@ const AddEntityModal = ({ isOpen, title, entityLabel, availableOptions, onConfir
                         <button
                           key={opt.id}
                           onClick={() => setSelectedId(String(opt.id))}
-                          className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-150 flex items-center justify-between group ${
-                            isSelected
-                              ? 'bg-[#050a30] border-[#050a30] text-white shadow-md'
-                              : 'bg-white border-gray-100 hover:border-[#04a7bd]/40 hover:bg-[#04a7bd]/5 text-[#050a30]'
-                          }`}
+                          className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-150 flex items-center justify-between group ${isSelected
+                            ? 'bg-[#050a30] border-[#050a30] text-white shadow-md'
+                            : 'bg-white border-gray-100 hover:border-[#04a7bd]/40 hover:bg-[#04a7bd]/5 text-[#050a30]'
+                            }`}
                         >
                           <span className={`text-sm font-medium ${isSelected ? 'text-white' : ''}`}>
                             {isSelected ? name : highlightMatch(name)}
@@ -2027,7 +2388,7 @@ export default function Dashboard({ session }: DashboardProps) {
           if (error) throw error;
 
           setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
-          
+
           // Refresh the overview list
           const floatingBtn = document.querySelector('button[title="Ver todos os colaboradores"]') as HTMLButtonElement;
           if (floatingBtn) floatingBtn.click();
@@ -2225,9 +2586,38 @@ export default function Dashboard({ session }: DashboardProps) {
   // PCMSO Preview Modal State
   const [pcmsoPreview, setPcmsoPreview] = useState<{ isOpen: boolean, content: string, companyName: string } | null>(null);
 
-  // Loaders
+  // Loaders e Busca
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // Estado debulhado (disparado após 1s de inatividade)
+  const [filteredCompaniesList, setFilteredCompaniesList] = useState<Cliente[]>([]);
+  const [isFiltering, setIsFiltering] = useState(false);
+
+  // Sincroniza a listagem quando o termo de busca debulhado chegar
+  useEffect(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const digitsOnly = term.replace(/\D/g, '');
+
+    // Se houver termo, mostra o loading para indicar processamento
+    if (term) setIsFiltering(true);
+
+    const timer = setTimeout(() => {
+      const filtered = companies.filter(c => {
+        // Busca textual
+        const matchName = term && (c.nome_fantasia?.toLowerCase().includes(term) ||
+          c.razao_social?.toLowerCase().includes(term));
+
+        // Busca por CNPJ (só ativa se houver números na busca ou se o termo for o CNPJ puro)
+        const matchCnpj = digitsOnly && c.cnpj?.replace(/\D/g, '').includes(digitsOnly);
+
+        return term === '' || matchName || matchCnpj;
+      });
+
+      setFilteredCompaniesList(filtered);
+      setIsFiltering(false);
+    }, term ? 400 : 0); // Delay zero se a busca estiver vazia para resposta instantânea
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, companies]);
 
   // Forms
   const [newUnitName, setNewUnitName] = useState('');
@@ -2241,7 +2631,6 @@ export default function Dashboard({ session }: DashboardProps) {
   // Use a ref so refreshCurrentView can call openHierarchy without
   // being listed in its deps (openHierarchy is declared later).
   const openHierarchyRef = useRef<((company: Cliente) => Promise<void>) | null>(null);
-
   // --- Utility: Refresher ---
   const refreshCurrentView = useCallback(async () => {
     if (activeTab === 'dashboard') await fetchGeneralStats();
@@ -3445,8 +3834,6 @@ export default function Dashboard({ session }: DashboardProps) {
     else if (view === 'sectors') { setSelectedUnit(null); setUnitSectors([]); setView('units'); }
     else if (view === 'units') { setSelectedCompany(null); setUnits([]); setView('companies'); }
   };
-  const filteredCompanies = companies.filter(c => c.nome_fantasia?.toLowerCase().includes(searchTerm.toLowerCase()));
-
   const Sidebar = () => (
     <aside className={`fixed inset-y-0 left-0 z-40 bg-white/80 backdrop-blur-xl border-r border-gray-200 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static flex flex-col ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'} ${isSidebarCollapsed ? 'w-20' : 'w-80'}`}>
       {/* Sidebar Header / Logo */}
@@ -3600,6 +3987,8 @@ export default function Dashboard({ session }: DashboardProps) {
                     onMouseLeave={handleMouseUp}
                     onWheel={handleWheel}
                   >
+                    {/* Notificações do Sistema em Lista (Estructurada) */}
+                    <NotifyList />
                     {/* Infinite Grid Background (updated via gridRef directly on pan) */}
                     <div
                       ref={gridRef}
@@ -3879,11 +4268,10 @@ export default function Dashboard({ session }: DashboardProps) {
                                                   >
                                                     <Trash2 size={14} />
                                                   </button>
-                                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                                    colab.ativo === 'ativo'
-                                                      ? 'bg-green-50 text-green-600'
-                                                      : 'bg-red-50 text-red-500'
-                                                  }`}>
+                                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${colab.ativo === 'ativo'
+                                                    ? 'bg-green-50 text-green-600'
+                                                    : 'bg-red-50 text-red-500'
+                                                    }`}>
                                                     {colab.ativo === 'ativo' ? 'Ativo' : 'Inativo'}
                                                   </span>
                                                 </div>
@@ -3947,7 +4335,7 @@ export default function Dashboard({ session }: DashboardProps) {
                         </div>
 
                         {/* Body */}
-                        <div className="p-8 space-y-6">
+                        <div className="p-8 space-y-6">b
                           {editColabModal.loading && !editColabModal.saving ? (
                             <div className="flex flex-col items-center justify-center py-10 text-gray-400">
                               <div className="w-10 h-10 border-4 border-[#04a7bd] border-t-transparent rounded-full animate-spin mb-4" />
@@ -4046,13 +4434,24 @@ export default function Dashboard({ session }: DashboardProps) {
                   </div>
                   {view === 'companies' && (
                     <>
-                      <div className="mb-8"><Input placeholder="Buscar empresa..." icon={<Search size={20} />} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-xl" /></div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredCompanies.map((company) => {
-                          const hasUser = companiesWithUsers.has(company.id);
-                          return (<GlassCard key={company.id} onClick={() => handleCompanyClick(company)} hoverEffect={true} className="p-6 min-h-[180px] flex flex-col justify-between group"><div className="flex justify-between items-start"><div className="w-12 h-12 rounded-xl bg-[#04a7bd]/10 flex items-center justify-center text-[#04a7bd]"><Briefcase size={24} /></div><div className="flex gap-2"><button onClick={(e) => { e.stopPropagation(); if (!hasUser) triggerCreateUser(company); }} disabled={hasUser} className={`p-2 rounded-full transition-colors ${hasUser ? 'bg-green-100 text-green-600 cursor-not-allowed' : 'bg-gray-100 text-[#04a7bd] hover:bg-[#04a7bd] hover:text-white'}`} title={hasUser ? "Usuário já existe" : "Criar Acesso de Usuário"}><UserPlus size={18} /></button><button onClick={(e) => { e.stopPropagation(); openHierarchy(company); }} className="bg-gray-100 p-2 rounded-full text-[#149890] hover:scale-110 transition-transform" title="Mapa Organizacional"><Network size={18} /></button></div></div><div><h3 className="text-xl font-bold text-[#050a30] truncate">{company.nome_fantasia || 'Sem Nome'}</h3><p className="text-sm text-gray-500 truncate">{company.razao_social}</p>{company.cnpj && <p className="text-xs text-[#149890] mt-2 font-mono bg-[#149890]/10 inline-block px-2 py-1 rounded-lg">{company.cnpj}</p>}</div></GlassCard>);
-                        })}
-                      </div>
+                      <CompanySearch
+                        onSearch={setSearchTerm}
+                        isSearching={isFiltering}
+                      />
+
+                      {isFiltering ? (
+                        <div className="py-20 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm rounded-[32px] border border-dashed border-gray-200">
+                          <Spinner label="Filtrando empresas..." />
+                        </div>
+                      ) : (
+                        <CompanyList
+                          companies={filteredCompaniesList}
+                          companiesWithUsers={companiesWithUsers}
+                          onCompanyClick={openHierarchy}
+                          triggerCreateUser={triggerCreateUser}
+                          openHierarchy={openHierarchy}
+                        />
+                      )}
                     </>
                   )}
                   {view === 'units' && selectedCompany && (
