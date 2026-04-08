@@ -673,7 +673,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                   if (currentType === 'Demissional') return item.demissao === true;
                   // Periódico logic: usually defined by existence of periodicidade or explicit flag. 
                   // Based on schema, periodicidade is numeric. If > 0, it applies.
-                  if (currentType === 'Periódico') return item.periodicidade && Number(item.periodicidade) > 0;
+                  if (currentType === 'Periódico' || currentType === 'Periódico Semestral' || currentType === 'Periódico Bienal') return item.periodicidade && Number(item.periodicidade) > 0;
                   // Value in select is 'Retorno'
                   if (currentType === 'Retorno') return item.ret_trabalho === true;
                   // Value in select is 'Mudança'
@@ -838,7 +838,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                              <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Tipo de Exame</label>
                              <div className="relative">
                                  <select value={appointmentData.tipo} onChange={(e) => setAppointmentData({...appointmentData,tipo: e.target.value})} className="w-full bg-white/50 backdrop-blur-md border border-gray-100 rounded-2xl py-4 px-4 text-[#050a30] font-medium appearance-none focus:outline-none focus:border-[#04a7bd]/30 cursor-pointer">
-                                    <option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Retorno">Retorno ao Trabalho</option><option value="Mudança">Mudança de Função</option>
+                                    <option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Periódico Semestral">Periódico Semestral</option><option value="Periódico Bienal">Periódico Bienal</option><option value="Retorno">Retorno ao Trabalho</option><option value="Mudança">Mudança de Função</option>
                                  </select>
                                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                              </div>

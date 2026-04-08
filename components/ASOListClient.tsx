@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
-import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus, Filter, ClipboardList, Eye, FileCheck } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus, Filter, ClipboardList, Eye, FileCheck, MessageSquareText } from 'lucide-react';
 
 // --- Interfaces ---
 
@@ -15,6 +15,7 @@ interface AsoItem {
   status_agendamento: string; // 'pendente', 'concluido', etc from agendamentos table
   has_prontuario?: boolean;
   has_esoc?: boolean;
+  observacoes?: string | null;
 }
 
 interface ColaboradorData {
@@ -74,7 +75,7 @@ const IOSInput: React.FC<{
   </div>
 );
 
-const HistoryModal = ({ isOpen, colaborador, onClose }: { isOpen: boolean, colaborador: ColaboradorData | null, onClose: () => void }) => {
+const HistoryModal = ({ isOpen, colaborador, onClose, onViewObs }: { isOpen: boolean, colaborador: ColaboradorData | null, onClose: () => void, onViewObs: (obs: string, name: string) => void }) => {
     if (!isOpen || !colaborador) return null;
 
     const handleDownload = (url: string | null) => {
@@ -136,16 +137,30 @@ const HistoryModal = ({ isOpen, colaborador, onClose }: { isOpen: boolean, colab
                                     </div>
                                 </div>
                                 
-                                {item.aso_url ? (
-                                    <Button 
-                                        onClick={() => handleDownload(item.aso_url)} 
-                                        className="h-10 text-xs font-bold px-4 !bg-[#04a7bd] hover:!bg-[#038e9e] !shadow-none whitespace-nowrap"
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => item.observacoes ? onViewObs(item.observacoes, colaborador?.nome || '') : undefined}
+                                        disabled={!item.observacoes}
+                                        className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors shrink-0 border ${
+                                            item.observacoes 
+                                                ? 'bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200 cursor-pointer' 
+                                                : 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed opacity-50'
+                                        }`}
+                                        title={item.observacoes ? 'Ver observações' : 'Sem observações'}
                                     >
-                                        <Download size={14} /> Baixar PDF
-                                    </Button>
-                                ) : (
-                                    <span className="text-xs text-gray-400 font-medium italic px-4">Documento indisponível</span>
-                                )}
+                                        <MessageSquareText size={16} />
+                                    </button>
+                                    {item.aso_url ? (
+                                        <Button 
+                                            onClick={() => handleDownload(item.aso_url)} 
+                                            className="h-10 text-xs font-bold px-4 !bg-[#04a7bd] hover:!bg-[#038e9e] !shadow-none whitespace-nowrap"
+                                        >
+                                            <Download size={14} /> Baixar PDF
+                                        </Button>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 font-medium italic px-4">Documento indisponível</span>
+                                    )}
+                                </div>
                             </div>
                         ))
                     )}
@@ -333,6 +348,44 @@ const ESocModal = ({ isOpen, agendamentoId, patientName, onClose }: { isOpen: bo
     );
 };
 
+const ObservacoesModal = ({ isOpen, observacoes, patientName, onClose }: { isOpen: boolean, observacoes: string, patientName: string, onClose: () => void }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+            <GlassCard className="w-full max-w-lg bg-white border-none shadow-2xl flex flex-col max-h-[85vh] p-0 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                            <MessageSquareText size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-[#050a30]">Observações</h3>
+                            <p className="text-xs text-gray-500">Colaborador: {patientName}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
+                    {observacoes ? (
+                        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                            <p className="text-sm text-[#050a30] leading-relaxed whitespace-pre-wrap">{observacoes}</p>
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-gray-400">
+                            <MessageSquareText size={40} className="mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">Nenhuma observação registrada.</p>
+                        </div>
+                    )}
+                </div>
+            </GlassCard>
+        </div>
+    );
+};
+
 export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const [loading, setLoading] = useState(true);
   const [collaborators, setCollaborators] = useState<ColaboradorData[]>([]);
@@ -344,6 +397,7 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const [selectedColab, setSelectedColab] = useState<ColaboradorData | null>(null);
   const [prontuarioModal, setProntuarioModal] = useState<{ isOpen: boolean, agendamentoId: number, patientName: string }>({ isOpen: false, agendamentoId: 0, patientName: '' });
   const [esocModal, setEsocModal] = useState<{ isOpen: boolean, agendamentoId: number, patientName: string }>({ isOpen: false, agendamentoId: 0, patientName: '' });
+  const [obsModal, setObsModal] = useState<{ isOpen: boolean, observacoes: string, patientName: string }>({ isOpen: false, observacoes: '', patientName: '' });
 
   useEffect(() => {
     fetchData();
@@ -414,6 +468,7 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
           tipo,
           status,
           colaborador_id,
+          observacoes,
           unidade_info:unidades(nome_unidade),
           prontuarios:prontuarios_agendamentos!prontuarios_agendamentos_agendamento_id_fkey(id),
           esoc:esoc_agendamentos!esoc_agendamentos_agendamento_id_fkey(id)
@@ -472,7 +527,8 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                       unidade_info: item.unidade_info,
                       status_agendamento: item.status,
                       has_prontuario: hasProntuario,
-                      has_esoc: hasEsoc
+                      has_esoc: hasEsoc,
+                      observacoes: item.observacoes
                   });
               }
           });
@@ -539,6 +595,11 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const handleOpenESoc = (e: React.MouseEvent, agendamentoId: number, name: string) => {
       e.stopPropagation();
       setEsocModal({ isOpen: true, agendamentoId, patientName: name });
+  };
+
+  const handleOpenObs = (e: React.MouseEvent, observacoes: string | null | undefined, name: string) => {
+      e.stopPropagation();
+      setObsModal({ isOpen: true, observacoes: observacoes || '', patientName: name });
   };
 
   const formatCPF = (cpf: string | null) => {
@@ -715,6 +776,18 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                             </Button>
                         )}
 
+                        <button 
+                            onClick={(e) => colab.ultimo_aso?.observacoes ? handleOpenObs(e, colab.ultimo_aso?.observacoes, colab.nome) : e.stopPropagation()}
+                            disabled={!colab.ultimo_aso?.observacoes}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 border ${
+                                colab.ultimo_aso?.observacoes 
+                                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200 cursor-pointer' 
+                                    : 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed opacity-50'
+                            }`}
+                            title={colab.ultimo_aso?.observacoes ? 'Ver observações' : 'Sem observações'}
+                        >
+                            <MessageSquareText size={16} />
+                        </button>
                         
                         <button className="w-10 h-10 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors shrink-0">
                            <ChevronRight size={20} />
@@ -729,7 +802,8 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
       <HistoryModal 
         isOpen={!!selectedColab} 
         colaborador={selectedColab} 
-        onClose={() => setSelectedColab(null)} 
+        onClose={() => setSelectedColab(null)}
+        onViewObs={(obs, name) => setObsModal({ isOpen: true, observacoes: obs, patientName: name })}
       />
 
       <ProntuarioModal 
@@ -737,6 +811,13 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
         agendamentoId={prontuarioModal.agendamentoId}
         patientName={prontuarioModal.patientName}
         onClose={() => setProntuarioModal(prev => ({ ...prev, isOpen: false }))} 
+      />
+
+      <ObservacoesModal 
+        isOpen={obsModal.isOpen}
+        observacoes={obsModal.observacoes}
+        patientName={obsModal.patientName}
+        onClose={() => setObsModal(prev => ({ ...prev, isOpen: false }))}
       />
 
       <ESocModal 
