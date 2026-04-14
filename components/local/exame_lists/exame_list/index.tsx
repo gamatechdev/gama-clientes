@@ -54,6 +54,7 @@ export const EXAMES_LIST_EXPORT = [
     { "idx": 48, "id": 495, "nome": "Teste Romberg" },
     { "idx": 49, "id": 496, "nome": "Exame Toxicológico Urina" },
     { "idx": 50, "id": 497, "nome": "Higidez" },
-    { "idx": 51, "id": 498, "nome": "Grupo Sanguíneo" }
+    { "idx": 51, "id": 498, "nome": "Grupo Sanguíneo" },
+    { "idx": 52, "id": 212, "nome": "Exame de Epworth" }
 ];
 

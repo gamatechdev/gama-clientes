@@ -404,7 +404,8 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     data_atendimento: new Date().toISOString().split('T')[0],
     tipo: 'Admissional',
     unidade: '',
-    unidadeId: 0
+    unidadeId: 0,
+    observacoes: ''
   });
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
 
@@ -572,7 +573,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   const startNew = () => {
       setSelectedColabId('');
       setColabFormData({ nome: '', cpf: '', data_nascimento: '', sexo: 'M', setor: '', setorId: '', funcao: '', cargoId: '' });
-      setAppointmentData(prev => ({ ...prev, tipo: 'Admissional', unidade: '', unidadeId: 0 }));
+      setAppointmentData(prev => ({ ...prev, tipo: 'Admissional', unidade: '', unidadeId: 0, observacoes: '' }));
       setFilteredSectors([]);
       setFilteredRoles([]);
       setUnitSearchTerm('');
@@ -704,7 +705,8 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         ficha_url: generatedUrl,
         status: 'pendente',
         recepcao: 'Aguardando',
-        enviado_empresa: true
+        enviado_empresa: true,
+        observacoes: appointmentData.observacoes
       }]);
 
       if (error) throw error;
@@ -843,6 +845,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                              </div>
                           </div>
+                          <IOSInput label="Observações (Opcional)" value={appointmentData.observacoes} onChange={(v) => setAppointmentData({...appointmentData, observacoes: v})} placeholder="Ex: Paciente com deficiência auditiva..." />
                        </div>
                        <div className="pt-4"><Button type="submit" className="w-full h-14 text-lg font-bold shadow-[0_10px_30px_rgba(4,167,189,0.2)] hover:shadow-[0_15px_40px_rgba(4,167,189,0.3)] transition-all transform active:scale-95" disabled={loading}>{loading ? 'Processando...' : <><Save size={20} /> Confirmar</>}</Button></div>
                    </form> 
