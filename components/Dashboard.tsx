@@ -62,6 +62,7 @@ interface ExameUnidadeItem {
   demissao: boolean;
   ret_trabalho: boolean;
   mud_riscos: boolean;
+  periodic: boolean;
   exames: { nome: string };
 }
 
@@ -1087,7 +1088,7 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   const [assignedExams, setAssignedExams] = useState<ExameUnidadeItem[]>([]);
   const [globalExams, setGlobalExams] = useState<Exame[]>([]);
   const [configExam, setConfigExam] = useState<{ id?: number, nome: string, isNew?: boolean }>({ nome: '' });
-  const [formFlags, setFormFlags] = useState<{ periodicidade: number | string, admissao: boolean, demissao: boolean, ret_trabalho: boolean, mud_riscos: boolean }>({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false });
+  const [formFlags, setFormFlags] = useState<{ periodicidade: number | string, admissao: boolean, demissao: boolean, ret_trabalho: boolean, mud_riscos: boolean, periodic: boolean, periodicoSemestral: boolean, periodicidadeEditada: boolean }>({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false, periodic: false, periodicoSemestral: false, periodicidadeEditada: false });
   const [sourceSectors, setSourceSectors] = useState<any[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1096,171 +1097,172 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   const [editingLinkId, setEditingLinkId] = useState<number | null>(null);
 
   useEffect(() => { if (isOpen && sectorLinkId) { setView('list'); setSearchTerm(''); setEditingLinkId(null); fetchAssignedExams(); } }, [isOpen, sectorLinkId]);
-  const fetchAssignedExams = async () => { setLoading(true); try { const { data, error } = await supabase.from('exames_unidade').select(`id, exame_id, periodicidade, admissao, demissao, ret_trabalho, mud_riscos, exames ( nome )`).eq('unidade_setor', sectorLinkId); if (error) throw error; setAssignedExams((data as unknown as ExameUnidadeItem[]) || []); } catch (err) { console.error(err); } finally { setLoading(false); } };
+  const fetchAssignedExams = async () => { setLoading(true); try { const { data, error } = await supabase.from('exames_unidade').select(`id, exame_id, periodicidade, admissao, demissao, ret_trabalho, mud_riscos, periodic, exames ( nome )`).eq('unidade_setor', sectorLinkId); if (error) throw error; setAssignedExams((data as unknown as ExameUnidadeItem[]) || []); } catch (err) { console.error(err); } finally { setLoading(false); } };
   const handleSearchGlobal = async (term: string) => { setSearchTerm(term); if (term.length < 2) { setGlobalExams([]); return; } const { data, error } = await supabase.from('exames').select('*').ilike('nome', `%${term}%`).limit(10); if (!error && data) { setGlobalExams(data); } };
-  const handleSelectExam = (exame: Exame) => { setConfigExam({ id: exame.id, nome: exame.nome, isNew: false }); setFormFlags({ periodicidade: exame.periodicidade || 12, admissao: !!exame.admissao, demissao: !!exame.demissao, ret_trabalho: !!exame.ret_trabalho, mud_riscos: !!exame.mud_riscos }); setEditingLinkId(null); setView('config'); };
-  const handleEditAssignment = (item: ExameUnidadeItem) => { setConfigExam({ id: item.exame_id, nome: item.exames?.nome || '', isNew: false }); setFormFlags({ periodicidade: item.periodicidade, admissao: item.admissao, demissao: item.demissao, ret_trabalho: item.ret_trabalho, mud_riscos: item.mud_riscos }); setEditingLinkId(item.id); setView('config'); };
-  const handleCreateNew = () => { setConfigExam({ nome: searchTerm, isNew: true }); setFormFlags({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false }); setEditingLinkId(null); setView('config'); };
-  const handleDeleteAssignment = async (id: number) => { 
-    if (!confirm("Remover este exame do setor?")) return; 
-    const { error } = await supabase.from('exames_unidade').delete().eq('id', id); 
-    if (!error) { 
+  const handleSelectExam = (exame: Exame) => { setConfigExam({ id: exame.id, nome: exame.nome, isNew: false }); setFormFlags({ periodicidade: exame.periodicidade || 12, admissao: !!exame.admissao, demissao: !!exame.demissao, ret_trabalho: !!exame.ret_trabalho, mud_riscos: !!exame.mud_riscos, periodic: false, periodicoSemestral: false, periodicidadeEditada: false }); setEditingLinkId(null); setView('config'); };
+  const handleEditAssignment = (item: ExameUnidadeItem) => { const isSemestral = !!item.periodic && Number(item.periodicidade) === 6; setConfigExam({ id: item.exame_id, nome: item.exames?.nome || '', isNew: false }); setFormFlags({ periodicidade: item.periodicidade, admissao: item.admissao, demissao: item.demissao, ret_trabalho: item.ret_trabalho, mud_riscos: item.mud_riscos, periodic: !!item.periodic, periodicoSemestral: isSemestral, periodicidadeEditada: true }); setEditingLinkId(item.id); setView('config'); };
+  const handleCreateNew = () => { setConfigExam({ nome: searchTerm, isNew: true }); setFormFlags({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false, periodic: false, periodicoSemestral: false, periodicidadeEditada: false }); setEditingLinkId(null); setView('config'); };
+  const handleDeleteAssignment = async (id: number) => {
+    if (!confirm("Remover este exame do setor?")) return;
+    const { error } = await supabase.from('exames_unidade').delete().eq('id', id);
+    if (!error) {
       toast.success({ title: "Removido", description: "Exame removido do setor com sucesso." });
-      fetchAssignedExams(); 
-    } else { 
+      fetchAssignedExams();
+    } else {
       toast.error({ title: "Erro na remoção", description: "Ocorreu uma falha ao tentar remover o exame." });
-    } 
+    }
   };
 
-  const handleSaveConfiguration = async () => { 
+  const handleSaveConfiguration = async () => {
     const periodicidadeNum = Number(formFlags.periodicidade);
 
     // Validação de Periodicidade
     if (isNaN(periodicidadeNum) || periodicidadeNum <= 0) {
-      toast.error({ 
-        title: "Dados Inválidos", 
-        description: "A periodicidade do exame deve ser um número maior que 0 meses." 
+      toast.error({
+        title: "Dados Inválidos",
+        description: "A periodicidade do exame deve ser um número maior que 0 meses."
       });
       return;
     }
 
     // Validação de Aplicabilidade (Pelo menos uma checkbox deve estar ativa)
-    const hasAnyFlag = formFlags.admissao || formFlags.demissao || formFlags.ret_trabalho || formFlags.mud_riscos;
+    const hasAnyFlag = formFlags.admissao || formFlags.demissao || formFlags.ret_trabalho || formFlags.mud_riscos || formFlags.periodic;
     if (!hasAnyFlag) {
-      toast.error({ 
-        title: "Seleção Obrigatória", 
-        description: "Selecione pelo menos uma aplicabilidade (Admissional, Demissional, etc.) para este exame." 
+      toast.error({
+        title: "Seleção Obrigatória",
+        description: "Selecione pelo menos uma aplicabilidade (Admissional, Demissional, etc.) para este exame."
       });
       return;
     }
 
-    setSaving(true); 
-    try { 
-      let finalExameId = configExam.id; 
-      
+    setSaving(true);
+    try {
+      let finalExameId = configExam.id;
+
       // Se for um novo exame sendo criado no catálogo global
-      if (configExam.isNew) { 
+      if (configExam.isNew) {
         const { data: newExame, error: createError } = await supabase
           .from('exames')
-          .insert({ 
-            nome: configExam.nome, 
-            periodicidade: periodicidadeNum 
+          .insert({
+            nome: configExam.nome,
+            periodicidade: periodicidadeNum
           })
           .select()
-          .single(); 
-          
-        if (createError) throw createError; 
-        finalExameId = newExame.id; 
-      } 
+          .single();
 
-      if (!finalExameId) throw new Error("ID do exame inválido"); 
-      
+        if (createError) throw createError;
+        finalExameId = newExame.id;
+      }
+
+      if (!finalExameId) throw new Error("ID do exame inválido");
+
       // Payload comum para vínculo de exame ao setor - Garantindo Booleanos explícitos
       const assignmentPayload = {
         periodicidade: periodicidadeNum,
         admissao: !!formFlags.admissao,
         demissao: !!formFlags.demissao,
         ret_trabalho: !!formFlags.ret_trabalho,
-        mud_riscos: !!formFlags.mud_riscos
+        mud_riscos: !!formFlags.mud_riscos,
+        periodic: !!formFlags.periodic
       };
 
-      if (editingLinkId) { 
+      if (editingLinkId) {
         // Atualiza vínculo existente
         const { error: updateError } = await supabase
           .from('exames_unidade')
           .update(assignmentPayload)
           .eq('id', editingLinkId);
-          
-        if (updateError) throw updateError; 
-      } else { 
+
+        if (updateError) throw updateError;
+      } else {
         // Cria novo vínculo no setor
         const { error: linkError } = await supabase
           .from('exames_unidade')
-          .insert({ 
-            unidade_setor: sectorLinkId, 
-            exame_id: finalExameId, 
-            ...assignmentPayload 
+          .insert({
+            unidade_setor: sectorLinkId,
+            exame_id: finalExameId,
+            ...assignmentPayload
           });
-          
-        if (linkError) throw linkError; 
-      } 
-      
-      toast.success({ 
-        title: editingLinkId ? "Atualizado" : "Vinculado", 
-        description: "Configurações do exame salvas com sucesso." 
+
+        if (linkError) throw linkError;
+      }
+
+      toast.success({
+        title: editingLinkId ? "Atualizado" : "Vinculado",
+        description: "Configurações do exame salvas com sucesso."
       });
 
-      setView('list'); 
-      setEditingLinkId(null); 
-      fetchAssignedExams(); 
-      setSearchTerm(''); 
-    } catch (err: any) { 
-      console.error(err); 
-      toast.error({ 
-        title: "Erro ao salvar", 
-        description: err.message 
+      setView('list');
+      setEditingLinkId(null);
+      fetchAssignedExams();
+      setSearchTerm('');
+    } catch (err: any) {
+      console.error(err);
+      toast.error({
+        title: "Erro ao salvar",
+        description: err.message
       });
-    } finally { 
-      setSaving(false); 
-    } 
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handlePrepareCopy = async () => { 
-    setLoading(true); 
-    try { 
-      const { data: currentLink } = await supabase.from('unidade_setor').select('unidade:unidades(empresaid)').eq('id', sectorLinkId).single(); 
-      const companyId = (currentLink as any)?.unidade?.empresaid; 
-      if (!companyId) throw new Error("Empresa não identificada."); 
-      const { data: sectors } = await supabase.from('unidade_setor').select(`id, setor ( nome ), unidade!inner ( id, nome_unidade, empresaid )`).eq('unidade.empresaid', companyId).neq('id', sectorLinkId); 
-      if (sectors) { 
-        const formatted = sectors.map((s: any) => ({ id: s.id, label: `${s.unidade.nome_unidade} > ${s.setor.nome}` })).sort((a, b) => a.label.localeCompare(b.label)); 
-        setSourceSectors(formatted); 
-      } 
-      setSelectedSourceId(''); 
-      setView('copy'); 
-    } catch (err: any) { 
+  const handlePrepareCopy = async () => {
+    setLoading(true);
+    try {
+      const { data: currentLink } = await supabase.from('unidade_setor').select('unidade:unidades(empresaid)').eq('id', sectorLinkId).single();
+      const companyId = (currentLink as any)?.unidade?.empresaid;
+      if (!companyId) throw new Error("Empresa não identificada.");
+      const { data: sectors } = await supabase.from('unidade_setor').select(`id, setor ( nome ), unidade!inner ( id, nome_unidade, empresaid )`).eq('unidade.empresaid', companyId).neq('id', sectorLinkId);
+      if (sectors) {
+        const formatted = sectors.map((s: any) => ({ id: s.id, label: `${s.unidade.nome_unidade} > ${s.setor.nome}` })).sort((a, b) => a.label.localeCompare(b.label));
+        setSourceSectors(formatted);
+      }
+      setSelectedSourceId('');
+      setView('copy');
+    } catch (err: any) {
       toast.error({ title: "Erro ao carregar", description: err.message });
-    } finally { 
-      setLoading(false); 
-    } 
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCopyExams = async () => { 
-    if (!selectedSourceId) return; 
-    setSaving(true); 
-    try { 
-      const { data: sourceExams } = await supabase.from('exames_unidade').select('*').eq('unidade_setor', selectedSourceId); 
-      if (!sourceExams || sourceExams.length === 0) { 
+  const handleCopyExams = async () => {
+    if (!selectedSourceId) return;
+    setSaving(true);
+    try {
+      const { data: sourceExams } = await supabase.from('exames_unidade').select('*').eq('unidade_setor', selectedSourceId);
+      if (!sourceExams || sourceExams.length === 0) {
         toast.warning({ title: "Sem dados", description: "O setor selecionado não possui exames cadastrados." });
-        setSaving(false); 
-        return; 
-      } 
-      const currentExamIds = assignedExams.map(ae => ae.exame_id); 
-      const examsToCopy = sourceExams.filter(se => !currentExamIds.includes(se.exame_id)).map(se => ({ 
-        unidade_setor: sectorLinkId, 
-        exame_id: se.exame_id, 
-        periodicidade: se.periodicidade, 
-        admissao: !!se.admissao, 
-        demissao: !!se.demissao, 
-        ret_trabalho: !!se.ret_trabalho, 
-        mud_riscos: !!se.mud_riscos 
-      })); 
-      if (examsToCopy.length === 0) { 
+        setSaving(false);
+        return;
+      }
+      const currentExamIds = assignedExams.map(ae => ae.exame_id);
+      const examsToCopy = sourceExams.filter(se => !currentExamIds.includes(se.exame_id)).map(se => ({
+        unidade_setor: sectorLinkId,
+        exame_id: se.exame_id,
+        periodicidade: se.periodicidade,
+        admissao: !!se.admissao,
+        demissao: !!se.demissao,
+        ret_trabalho: !!se.ret_trabalho,
+        mud_riscos: !!se.mud_riscos
+      }));
+      if (examsToCopy.length === 0) {
         toast.info({ title: "Aviso", description: "Todos os exames do setor de origem já estão cadastrados neste setor." });
-        setSaving(false); 
-        return; 
-      } 
-      const { error } = await supabase.from('exames_unidade').insert(examsToCopy); 
-      if (error) throw error; 
+        setSaving(false);
+        return;
+      }
+      const { error } = await supabase.from('exames_unidade').insert(examsToCopy);
+      if (error) throw error;
       toast.success({ title: "Cópia concluída", description: `${examsToCopy.length} exames copiados com sucesso!` });
-      setView('list'); 
-      fetchAssignedExams(); 
-    } catch (err: any) { 
-      console.error(err); 
+      setView('list');
+      fetchAssignedExams();
+    } catch (err: any) {
+      console.error(err);
       toast.error({ title: "Erro na cópia", description: err.message });
-    } finally { 
-      setSaving(false); 
-    } 
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -1284,7 +1286,7 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
               <X size={24} />
             </button>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
             {view === 'list' && (
               <div className="p-6">
@@ -1319,6 +1321,7 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
                             {item.demissao && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-bold">DEM</span>}
                             {item.ret_trabalho && <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 text-[10px] font-bold">RET</span>}
                             {item.mud_riscos && <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 text-[10px] font-bold">MUD</span>}
+                            {item.periodic && <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-600 text-[10px] font-bold">PER</span>}
                             <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold">{item.periodicidade} meses</span>
                           </div>
                         </div>
@@ -1369,23 +1372,23 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
               <div className="p-6 space-y-6">
                 <div>
                   <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Nome do Exame</label>
-                  <input 
-                    type="text" 
-                    value={configExam.nome} 
-                    onChange={(e) => configExam.isNew && setConfigExam({ ...configExam, nome: e.target.value })} 
-                    disabled={!configExam.isNew} 
-                    className={`w-full rounded-2xl py-3 px-4 border focus:outline-none ${configExam.isNew ? 'bg-white border-gray-200 focus:border-[#04a7bd]' : 'bg-gray-100 border-transparent text-gray-500 cursor-not-allowed'}`} 
+                  <input
+                    type="text"
+                    value={configExam.nome}
+                    onChange={(e) => configExam.isNew && setConfigExam({ ...configExam, nome: e.target.value })}
+                    disabled={!configExam.isNew}
+                    className={`w-full rounded-2xl py-3 px-4 border focus:outline-none ${configExam.isNew ? 'bg-white border-gray-200 focus:border-[#04a7bd]' : 'bg-gray-100 border-transparent text-gray-500 cursor-not-allowed'}`}
                   />
                 </div>
-                
+
                 <div className="flex gap-4">
                   <div className="w-1/2">
                     <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Periodicidade (meses)</label>
-                    <input 
-                      type="number" 
-                      className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd]" 
-                      value={formFlags.periodicidade} 
-                      onChange={(e) => setFormFlags({ ...formFlags, periodicidade: e.target.value })} 
+                    <input
+                      type="number"
+                      className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd]"
+                      value={formFlags.periodicidade}
+                      onChange={(e) => setFormFlags({ ...formFlags, periodicidade: e.target.value, periodicidadeEditada: true })}
                     />
                   </div>
                 </div>
@@ -1394,49 +1397,67 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
                   <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Aplicabilidade neste Setor</label>
                   <div className="grid grid-cols-2 gap-3">
                     <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.admissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!formFlags.admissao} 
-                        onChange={(e) => setFormFlags({ ...formFlags, admissao: e.target.checked })} 
-                        className="w-4 h-4 accent-[#04a7bd]" 
+                      <input
+                        type="checkbox"
+                        checked={!!formFlags.admissao}
+                        onChange={(e) => setFormFlags({ ...formFlags, admissao: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                        className="w-4 h-4 accent-[#04a7bd]"
                       />
                       <span className="text-sm font-medium text-[#050a30]">Admissional</span>
                     </label>
 
                     <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.demissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!formFlags.demissao} 
-                        onChange={(e) => setFormFlags({ ...formFlags, demissao: e.target.checked })} 
-                        className="w-4 h-4 accent-[#04a7bd]" 
+                      <input
+                        type="checkbox"
+                        checked={!!formFlags.demissao}
+                        onChange={(e) => setFormFlags({ ...formFlags, demissao: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                        className="w-4 h-4 accent-[#04a7bd]"
                       />
                       <span className="text-sm font-medium text-[#050a30]">Demissional</span>
                     </label>
 
                     <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.ret_trabalho ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!formFlags.ret_trabalho} 
-                        onChange={(e) => setFormFlags({ ...formFlags, ret_trabalho: e.target.checked })} 
-                        className="w-4 h-4 accent-[#04a7bd]" 
+                      <input
+                        type="checkbox"
+                        checked={!!formFlags.ret_trabalho}
+                        onChange={(e) => setFormFlags({ ...formFlags, ret_trabalho: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                        className="w-4 h-4 accent-[#04a7bd]"
                       />
                       <span className="text-sm font-medium text-[#050a30]">Retorno ao Trabalho</span>
                     </label>
 
                     <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.mud_riscos ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input 
-                        type="checkbox" 
-                        checked={!!formFlags.mud_riscos} 
-                        onChange={(e) => setFormFlags({ ...formFlags, mud_riscos: e.target.checked })} 
-                        className="w-4 h-4 accent-[#04a7bd]" 
+                      <input
+                        type="checkbox"
+                        checked={!!formFlags.mud_riscos}
+                        onChange={(e) => setFormFlags({ ...formFlags, mud_riscos: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                        className="w-4 h-4 accent-[#04a7bd]"
                       />
                       <span className="text-sm font-medium text-[#050a30]">Mudança de Riscos</span>
+                    </label>
+                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.periodic && !formFlags.periodicoSemestral ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!formFlags.periodic && !formFlags.periodicoSemestral}
+                        onChange={(e) => setFormFlags({ ...formFlags, periodic: e.target.checked, periodicoSemestral: false })}
+                        className="w-4 h-4 accent-[#04a7bd]"
+                      />
+                      <span className="text-sm font-medium text-[#050a30]">Periódico</span>
+                    </label>
+                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.periodicoSemestral ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!formFlags.periodicoSemestral}
+                        onChange={(e) => setFormFlags({ ...formFlags, periodicoSemestral: e.target.checked, periodic: e.target.checked, periodicidade: e.target.checked ? 6 : formFlags.periodicidade })}
+                        className="w-4 h-4 accent-green-600"
+                      />
+                      <span className="text-sm font-medium text-[#050a30]">Periódico Semestral</span>
                     </label>
                   </div>
                 </div>
               </div>
             )}
-            
+
             {view === 'copy' && (
               <div className="p-6 space-y-6">
                 <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-700 border border-blue-100 flex gap-2">
@@ -1446,9 +1467,9 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
                 <div>
                   <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Selecione o Setor de Origem</label>
                   <div className="relative">
-                    <select 
-                      value={selectedSourceId} 
-                      onChange={(e) => setSelectedSourceId(e.target.value)} 
+                    <select
+                      value={selectedSourceId}
+                      onChange={(e) => setSelectedSourceId(e.target.value)}
                       className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd] appearance-none"
                     >
                       <option value="">Selecione...</option>
@@ -1460,7 +1481,7 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
               </div>
             )}
           </div>
-          
+
           <div className="p-4 border-t border-gray-100 bg-white flex gap-3 shrink-0">
             {view === 'list' ? (
               <Button onClick={onClose} className="w-full bg-gray-100 text-gray-600 hover:bg-gray-200 !shadow-none">Fechar</Button>
