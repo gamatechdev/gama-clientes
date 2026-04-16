@@ -1088,7 +1088,7 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   const [assignedExams, setAssignedExams] = useState<ExameUnidadeItem[]>([]);
   const [globalExams, setGlobalExams] = useState<Exame[]>([]);
   const [configExam, setConfigExam] = useState<{ id?: number, nome: string, isNew?: boolean }>({ nome: '' });
-  const [formFlags, setFormFlags] = useState<{ periodicidade: number | string, admissao: boolean, demissao: boolean, ret_trabalho: boolean, mud_riscos: boolean, periodic: boolean, periodicoSemestral: boolean, periodicidadeEditada: boolean }>({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false, periodic: false, periodicoSemestral: false, periodicidadeEditada: false });
+  const [formFlags, setFormFlags] = useState<{ periodicidade: number | string, admissao: boolean, demissao: boolean, ret_trabalho: boolean, mud_riscos: boolean, periodic: boolean, periodicoSemestral: boolean, periodicoBienal: boolean, periodicoRetorno: boolean, periodicidadeEditada: boolean }>({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false, periodic: false, periodicoSemestral: false, periodicoBienal: false, periodicoRetorno: false, periodicidadeEditada: false });
   const [sourceSectors, setSourceSectors] = useState<any[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1099,9 +1099,9 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   useEffect(() => { if (isOpen && sectorLinkId) { setView('list'); setSearchTerm(''); setEditingLinkId(null); fetchAssignedExams(); } }, [isOpen, sectorLinkId]);
   const fetchAssignedExams = async () => { setLoading(true); try { const { data, error } = await supabase.from('exames_unidade').select(`id, exame_id, periodicidade, admissao, demissao, ret_trabalho, mud_riscos, periodic, exames ( nome )`).eq('unidade_setor', sectorLinkId); if (error) throw error; setAssignedExams((data as unknown as ExameUnidadeItem[]) || []); } catch (err) { console.error(err); } finally { setLoading(false); } };
   const handleSearchGlobal = async (term: string) => { setSearchTerm(term); if (term.length < 2) { setGlobalExams([]); return; } const { data, error } = await supabase.from('exames').select('*').ilike('nome', `%${term}%`).limit(10); if (!error && data) { setGlobalExams(data); } };
-  const handleSelectExam = (exame: Exame) => { setConfigExam({ id: exame.id, nome: exame.nome, isNew: false }); setFormFlags({ periodicidade: exame.periodicidade || 12, admissao: !!exame.admissao, demissao: !!exame.demissao, ret_trabalho: !!exame.ret_trabalho, mud_riscos: !!exame.mud_riscos, periodic: false, periodicoSemestral: false, periodicidadeEditada: false }); setEditingLinkId(null); setView('config'); };
-  const handleEditAssignment = (item: ExameUnidadeItem) => { const isSemestral = !!item.periodic && Number(item.periodicidade) === 6; setConfigExam({ id: item.exame_id, nome: item.exames?.nome || '', isNew: false }); setFormFlags({ periodicidade: item.periodicidade, admissao: item.admissao, demissao: item.demissao, ret_trabalho: item.ret_trabalho, mud_riscos: item.mud_riscos, periodic: !!item.periodic, periodicoSemestral: isSemestral, periodicidadeEditada: true }); setEditingLinkId(item.id); setView('config'); };
-  const handleCreateNew = () => { setConfigExam({ nome: searchTerm, isNew: true }); setFormFlags({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false, periodic: false, periodicoSemestral: false, periodicidadeEditada: false }); setEditingLinkId(null); setView('config'); };
+  const handleSelectExam = (exame: Exame) => { setConfigExam({ id: exame.id, nome: exame.nome, isNew: false }); setFormFlags({ periodicidade: exame.periodicidade || 12, admissao: !!exame.admissao, demissao: !!exame.demissao, ret_trabalho: !!exame.ret_trabalho, mud_riscos: !!exame.mud_riscos, periodic: false, periodicoSemestral: false, periodicoBienal: false, periodicoRetorno: false, periodicidadeEditada: false }); setEditingLinkId(null); setView('config'); };
+  const handleEditAssignment = (item: ExameUnidadeItem) => { const isSemestral = !!item.periodic && Number(item.periodicidade) === 6; const isBienal = !!item.periodic && Number(item.periodicidade) === 24; const isRetorno = !!item.periodic && !!item.ret_trabalho && !isSemestral && !isBienal; setConfigExam({ id: item.exame_id, nome: item.exames?.nome || '', isNew: false }); setFormFlags({ periodicidade: item.periodicidade, admissao: item.admissao, demissao: item.demissao, ret_trabalho: item.ret_trabalho, mud_riscos: item.mud_riscos, periodic: !!item.periodic, periodicoSemestral: isSemestral, periodicoBienal: isBienal, periodicoRetorno: isRetorno, periodicidadeEditada: true }); setEditingLinkId(item.id); setView('config'); };
+  const handleCreateNew = () => { setConfigExam({ nome: searchTerm, isNew: true }); setFormFlags({ periodicidade: 12, admissao: false, demissao: false, ret_trabalho: false, mud_riscos: false, periodic: false, periodicoSemestral: false, periodicoBienal: false, periodicoRetorno: false, periodicidadeEditada: false }); setEditingLinkId(null); setView('config'); };
   const handleDeleteAssignment = async (id: number) => {
     if (!confirm("Remover este exame do setor?")) return;
     const { error } = await supabase.from('exames_unidade').delete().eq('id', id);
@@ -1114,19 +1114,20 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
   };
 
   const handleSaveConfiguration = async () => {
-    const periodicidadeNum = Number(formFlags.periodicidade);
+    const isPeriodicChecked = !!(formFlags.periodic || formFlags.periodicoSemestral || formFlags.periodicoBienal || formFlags.periodicoRetorno);
+    const periodicidadeNum = isPeriodicChecked ? Number(formFlags.periodicidade) : 0;
 
-    // Validação de Periodicidade
-    if (isNaN(periodicidadeNum) || periodicidadeNum <= 0) {
+    // Validação de Periodicidade apenas se algum Periódico estiver marcado
+    if (isPeriodicChecked && (isNaN(periodicidadeNum) || periodicidadeNum <= 0)) {
       toast.error({
         title: "Dados Inválidos",
-        description: "A periodicidade do exame deve ser um número maior que 0 meses."
+        description: "A periodicidade do exame periódico deve ser um número maior que 0 meses."
       });
       return;
     }
 
     // Validação de Aplicabilidade (Pelo menos uma checkbox deve estar ativa)
-    const hasAnyFlag = formFlags.admissao || formFlags.demissao || formFlags.ret_trabalho || formFlags.mud_riscos || formFlags.periodic;
+    const hasAnyFlag = formFlags.admissao || formFlags.demissao || formFlags.ret_trabalho || formFlags.mud_riscos || isPeriodicChecked;
     if (!hasAnyFlag) {
       toast.error({
         title: "Seleção Obrigatória",
@@ -1245,7 +1246,8 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
         admissao: !!se.admissao,
         demissao: !!se.demissao,
         ret_trabalho: !!se.ret_trabalho,
-        mud_riscos: !!se.mud_riscos
+        mud_riscos: !!se.mud_riscos,
+        periodic: !!se.periodic
       }));
       if (examsToCopy.length === 0) {
         toast.info({ title: "Aviso", description: "Todos os exames do setor de origem já estão cadastrados neste setor." });
@@ -1321,7 +1323,8 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
                             {item.demissao && <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-bold">DEM</span>}
                             {item.ret_trabalho && <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 text-[10px] font-bold">RET</span>}
                             {item.mud_riscos && <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 text-[10px] font-bold">MUD</span>}
-                            {item.periodic && <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-600 text-[10px] font-bold">PER</span>}
+                            {item.periodic && !item.periodico_bienal && <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-600 text-[10px] font-bold">PER</span>}
+                            {item.periodico_bienal && <span className="px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 text-[10px] font-bold">BIE</span>}
                             <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold">{item.periodicidade} meses</span>
                           </div>
                         </div>
@@ -1386,8 +1389,9 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
                     <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Periodicidade (meses)</label>
                     <input
                       type="number"
-                      className="w-full bg-white border border-gray-200 text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none focus:border-[#04a7bd]"
-                      value={formFlags.periodicidade}
+                      disabled={!(formFlags.periodic || formFlags.periodicoSemestral || formFlags.periodicoBienal || formFlags.periodicoRetorno)}
+                      className={`w-full border text-[#050a30] rounded-2xl py-3 px-4 focus:outline-none transition-all ${(!(formFlags.periodic || formFlags.periodicoSemestral || formFlags.periodicoBienal || formFlags.periodicoRetorno)) ? 'bg-gray-100 border-transparent text-gray-400 cursor-not-allowed' : 'bg-white border-gray-200 focus:border-[#04a7bd]'}`}
+                      value={!(formFlags.periodic || formFlags.periodicoSemestral || formFlags.periodicoBienal || formFlags.periodicoRetorno) ? 0 : formFlags.periodicidade}
                       onChange={(e) => setFormFlags({ ...formFlags, periodicidade: e.target.value, periodicidadeEditada: true })}
                     />
                   </div>
@@ -1395,64 +1399,92 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
 
                 <div>
                   <label className="block text-sm text-[#050a30]/80 mb-2 ml-1 font-medium">Aplicabilidade neste Setor</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.admissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input
-                        type="checkbox"
-                        checked={!!formFlags.admissao}
-                        onChange={(e) => setFormFlags({ ...formFlags, admissao: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
-                        className="w-4 h-4 accent-[#04a7bd]"
-                      />
-                      <span className="text-sm font-medium text-[#050a30]">Admissional</span>
-                    </label>
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Coluna Esquerda */}
+                    <div className="space-y-3">
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.admissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.admissao}
+                          onChange={(e) => setFormFlags({ ...formFlags, admissao: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                          className="w-4 h-4 accent-[#04a7bd]"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Admissional</span>
+                      </label>
 
-                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.demissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input
-                        type="checkbox"
-                        checked={!!formFlags.demissao}
-                        onChange={(e) => setFormFlags({ ...formFlags, demissao: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
-                        className="w-4 h-4 accent-[#04a7bd]"
-                      />
-                      <span className="text-sm font-medium text-[#050a30]">Demissional</span>
-                    </label>
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.demissao ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.demissao}
+                          onChange={(e) => setFormFlags({ ...formFlags, demissao: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                          className="w-4 h-4 accent-[#04a7bd]"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Demissional</span>
+                      </label>
 
-                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.ret_trabalho ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input
-                        type="checkbox"
-                        checked={!!formFlags.ret_trabalho}
-                        onChange={(e) => setFormFlags({ ...formFlags, ret_trabalho: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
-                        className="w-4 h-4 accent-[#04a7bd]"
-                      />
-                      <span className="text-sm font-medium text-[#050a30]">Retorno ao Trabalho</span>
-                    </label>
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.ret_trabalho ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.ret_trabalho}
+                          onChange={(e) => setFormFlags({ ...formFlags, ret_trabalho: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                          className="w-4 h-4 accent-[#04a7bd]"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Retorno ao Trabalho</span>
+                      </label>
 
-                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.mud_riscos ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input
-                        type="checkbox"
-                        checked={!!formFlags.mud_riscos}
-                        onChange={(e) => setFormFlags({ ...formFlags, mud_riscos: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
-                        className="w-4 h-4 accent-[#04a7bd]"
-                      />
-                      <span className="text-sm font-medium text-[#050a30]">Mudança de Riscos</span>
-                    </label>
-                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.periodic && !formFlags.periodicoSemestral ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input
-                        type="checkbox"
-                        checked={!!formFlags.periodic && !formFlags.periodicoSemestral}
-                        onChange={(e) => setFormFlags({ ...formFlags, periodic: e.target.checked, periodicoSemestral: false })}
-                        className="w-4 h-4 accent-[#04a7bd]"
-                      />
-                      <span className="text-sm font-medium text-[#050a30]">Periódico</span>
-                    </label>
-                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${formFlags.periodicoSemestral ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                      <input
-                        type="checkbox"
-                        checked={!!formFlags.periodicoSemestral}
-                        onChange={(e) => setFormFlags({ ...formFlags, periodicoSemestral: e.target.checked, periodic: e.target.checked, periodicidade: e.target.checked ? 6 : formFlags.periodicidade })}
-                        className="w-4 h-4 accent-green-600"
-                      />
-                      <span className="text-sm font-medium text-[#050a30]">Periódico Semestral</span>
-                    </label>
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.mud_riscos ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.mud_riscos}
+                          onChange={(e) => setFormFlags({ ...formFlags, mud_riscos: e.target.checked, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                          className="w-4 h-4 accent-[#04a7bd]"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Mudança de Riscos</span>
+                      </label>
+                    </div>
+
+                    {/* Coluna Direita */}
+                    <div className="space-y-3">
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.periodic && !formFlags.periodicoSemestral && !formFlags.periodicoBienal && !formFlags.periodicoRetorno ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.periodic && !formFlags.periodicoSemestral && !formFlags.periodicoBienal && !formFlags.periodicoRetorno}
+                          onChange={(e) => setFormFlags({ ...formFlags, periodic: e.target.checked, periodicoSemestral: false, periodicoBienal: false, periodicoRetorno: false })}
+                          className="w-4 h-4 accent-[#04a7bd]"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Periódico</span>
+                      </label>
+
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.periodicoSemestral ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.periodicoSemestral}
+                          onChange={(e) => setFormFlags({ ...formFlags, periodicoSemestral: e.target.checked, periodicoBienal: false, periodicoRetorno: false, periodic: e.target.checked, periodicidade: e.target.checked ? 6 : formFlags.periodicidade })}
+                          className="w-4 h-4 accent-green-600"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Periódico Semestral</span>
+                      </label>
+
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.periodicoBienal ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.periodicoBienal}
+                          onChange={(e) => setFormFlags({ ...formFlags, periodicoBienal: e.target.checked, periodicoSemestral: false, periodicoRetorno: false, periodic: e.target.checked, periodicidade: e.target.checked ? 24 : formFlags.periodicidade })}
+                          className="w-4 h-4 accent-orange-500"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Periódico Bienal</span>
+                      </label>
+
+                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all h-14 ${formFlags.periodicoRetorno ? 'bg-violet-50 border-violet-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!formFlags.periodicoRetorno}
+                          onChange={(e) => setFormFlags({ ...formFlags, periodicoRetorno: e.target.checked, periodicoSemestral: false, periodicoBienal: false, periodic: e.target.checked, ret_trabalho: e.target.checked ? true : formFlags.ret_trabalho, periodicidade: (e.target.checked && !formFlags.periodicidadeEditada) ? 12 : formFlags.periodicidade })}
+                          className="w-4 h-4 accent-violet-600"
+                        />
+                        <span className="text-sm font-medium text-[#050a30]">Retorno ao Trabalho (PER)</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -43,140 +43,140 @@ interface AgendaItem {
 }
 
 interface AppointmentFormClientProps {
-    preSelectedColabId?: string | null;
+  preSelectedColabId?: string | null;
 }
 
 interface OrientationData {
-    patientName: string;
-    date: string;
-    exams: string[];
+  patientName: string;
+  date: string;
+  exams: string[];
 }
 
 // --- Helper Components ---
 
 const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: OrientationData | null, onClose: () => void }) => {
-    const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-    useEffect(() => {
-        if (isOpen) setCopied(false);
-    }, [isOpen]);
+  useEffect(() => {
+    if (isOpen) setCopied(false);
+  }, [isOpen]);
 
-    if (!isOpen || !data) return null;
+  if (!isOpen || !data) return null;
 
-    const formatDateFull = (dateString: string) => {
-        if (!dateString) return '-';
-        const parts = dateString.split('-');
-        if (parts.length === 3) {
-          return `${parts[2]}/${parts[1]}/${parts[0]}`; 
-        }
-        return dateString;
-    };
+  const formatDateFull = (dateString: string) => {
+    if (!dateString) return '-';
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateString;
+  };
 
-    const hasAudiometria = data.exams.some(ex => ex.toLowerCase().includes('audiometria'));
-    const hasGlicemia = data.exams.some(ex => ex.toLowerCase().includes('glicemia') || ex.toLowerCase().includes('hemoglobina glicada'));
+  const hasAudiometria = data.exams.some(ex => ex.toLowerCase().includes('audiometria'));
+  const hasGlicemia = data.exams.some(ex => ex.toLowerCase().includes('glicemia') || ex.toLowerCase().includes('hemoglobina glicada'));
 
-    const handleCopy = () => {
-        let text = `Exame Ocupacional do(a) paciente ${data.patientName} está agendado para ${formatDateFull(data.date)}, às 7:00.\n`;
-        text += `Atendimento por ordem de chegada!\n\n`;
-        
-        if (data.exams.length > 0) {
-            text += `Exames Solicitados:\n`;
-            data.exams.forEach(ex => {
-                text += `${ex}\n`;
-            });
-            text += `\n`;
-        }
+  const handleCopy = () => {
+    let text = `Exame Ocupacional do(a) paciente ${data.patientName} está agendado para ${formatDateFull(data.date)}, às 7:00.\n`;
+    text += `Atendimento por ordem de chegada!\n\n`;
 
-        text += `Orientações dos exames ocupacionais:\n`;
-        text += `Levar RG e CPF!\n`;
-        
-        if (hasAudiometria) {
-            text += `Fazer repouso auditivo de 12 horas.\n`;
-        }
-        if (hasGlicemia) {
-            text += `Jejum de 8 horas.\n`;
-        }
+    if (data.exams.length > 0) {
+      text += `Exames Solicitados:\n`;
+      data.exams.forEach(ex => {
+        text += `${ex}\n`;
+      });
+      text += `\n`;
+    }
 
-        text += `\nEndereço da Clínica Gama Center: Rua Barão de Pouso Alegre, 90, São Sebastião, Conselheiro Lafaiete (ao lado da Igreja São Sebastião).`;
+    text += `Orientações dos exames ocupacionais:\n`;
+    text += `Levar RG e CPF!\n`;
 
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
+    if (hasAudiometria) {
+      text += `Fazer repouso auditivo de 12 horas.\n`;
+    }
+    if (hasGlicemia) {
+      text += `Jejum de 8 horas.\n`;
+    }
 
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300 p-4">
-            <GlassCard className="w-full max-w-lg p-0 bg-white border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh] [&>div.relative.z-10]:flex [&>div.relative.z-10]:flex-col [&>div.relative.z-10]:h-full [&>div.relative.z-10]:overflow-hidden">
-                <div className="bg-[#04a7bd] p-6 text-white text-center shrink-0">
-                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                        <Info size={32} />
-                    </div>
-                    <h3 className="text-2xl font-bold">Detalhes do Agendamento</h3>
-                    <p className="text-white/90 text-sm mt-1">Orientações e Preparo</p>
-                </div>
-                
-                <div className="p-8 overflow-y-auto custom-scrollbar text-[#050a30] text-sm leading-relaxed space-y-6 flex-1">
-                    <div>
-                        <p>
-                            Exame Ocupacional do(a) paciente <strong className="text-lg">{data.patientName}</strong> está agendado para <strong className="text-lg">{formatDateFull(data.date)}</strong>, <strong className="text-lg">às 7:00</strong>.
-                        </p>
-                        <p className="italic text-gray-500 mt-1 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100 inline-block">
-                            Atendimento por ordem de chegada!
-                        </p>
-                    </div>
+    text += `\nEndereço da Clínica Gama Center: Rua Barão de Pouso Alegre, 90, São Sebastião, Conselheiro Lafaiete (ao lado da Igreja São Sebastião).`;
 
-                    {data.exams.length > 0 && (
-                        <div>
-                            <h4 className="font-bold text-[#04a7bd] uppercase text-xs tracking-wider mb-2 border-b border-gray-100 pb-1">Exames Solicitados</h4>
-                            <ul className="list-disc pl-5 space-y-1 text-gray-700 font-medium">
-                                {data.exams.map((ex, i) => (
-                                    <li key={i}>{ex}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-                    <div>
-                        <h4 className="font-bold text-[#04a7bd] uppercase text-xs tracking-wider mb-2 border-b border-gray-100 pb-1">Orientações dos exames ocupacionais</h4>
-                        <ul className="space-y-2">
-                            <li className="flex items-start gap-2">
-                                <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
-                                <span>Levar RG e CPF!</span>
-                            </li>
-                            {hasAudiometria && (
-                                <li className="flex items-start gap-2">
-                                    <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
-                                    <span>Fazer repouso auditivo de 12 horas.</span>
-                                </li>
-                            )}
-                            {hasGlicemia && (
-                                <li className="flex items-start gap-2">
-                                    <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
-                                    <span>Jejum de 8 horas.</span>
-                                </li>
-                            )}
-                        </ul>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs text-gray-600">
-                        <div className="flex items-center gap-2 mb-2 font-bold text-[#050a30]">
-                            <MapPin size={16} className="text-[#04a7bd]" /> Endereço da Clínica Gama Center
-                        </div>
-                        <p>Rua Barão de Pouso Alegre, 90, São Sebastião, Conselheiro Lafaiete (ao lado da Igreja São Sebastião).</p>
-                    </div>
-                </div>
-
-                <div className="p-6 border-t border-gray-100 bg-gray-50 shrink-0 flex gap-3">
-                    <Button onClick={handleCopy} className={`flex-1 h-12 text-base font-bold shadow-md transition-all ${copied ? '!bg-green-600 hover:!bg-green-700 !text-white' : '!bg-blue-50 !text-blue-700 border border-blue-200 hover:!bg-blue-100 hover:border-blue-300'}`}>
-                        {copied ? <><CheckCircle size={20}/> Copiado!</> : <><Copy size={20}/> Copiar Texto</>}
-                    </Button>
-                    <Button onClick={onClose} className="flex-1 h-12 text-base font-bold shadow-lg">
-                        Entendido
-                    </Button>
-                </div>
-            </GlassCard>
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300 p-4">
+      <GlassCard className="w-full max-w-lg p-0 bg-white border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh] [&>div.relative.z-10]:flex [&>div.relative.z-10]:flex-col [&>div.relative.z-10]:h-full [&>div.relative.z-10]:overflow-hidden">
+        <div className="bg-[#04a7bd] p-6 text-white text-center shrink-0">
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+            <Info size={32} />
+          </div>
+          <h3 className="text-2xl font-bold">Detalhes do Agendamento</h3>
+          <p className="text-white/90 text-sm mt-1">Orientações e Preparo</p>
         </div>
-    );
+
+        <div className="p-8 overflow-y-auto custom-scrollbar text-[#050a30] text-sm leading-relaxed space-y-6 flex-1">
+          <div>
+            <p>
+              Exame Ocupacional do(a) paciente <strong className="text-lg">{data.patientName}</strong> está agendado para <strong className="text-lg">{formatDateFull(data.date)}</strong>, <strong className="text-lg">às 7:00</strong>.
+            </p>
+            <p className="italic text-gray-500 mt-1 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100 inline-block">
+              Atendimento por ordem de chegada!
+            </p>
+          </div>
+
+          {data.exams.length > 0 && (
+            <div>
+              <h4 className="font-bold text-[#04a7bd] uppercase text-xs tracking-wider mb-2 border-b border-gray-100 pb-1">Exames Solicitados</h4>
+              <ul className="list-disc pl-5 space-y-1 text-gray-700 font-medium">
+                {data.exams.map((ex, i) => (
+                  <li key={i}>{ex}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div>
+            <h4 className="font-bold text-[#04a7bd] uppercase text-xs tracking-wider mb-2 border-b border-gray-100 pb-1">Orientações dos exames ocupacionais</h4>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-2">
+                <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
+                <span>Levar RG e CPF!</span>
+              </li>
+              {hasAudiometria && (
+                <li className="flex items-start gap-2">
+                  <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
+                  <span>Fazer repouso auditivo de 12 horas.</span>
+                </li>
+              )}
+              {hasGlicemia && (
+                <li className="flex items-start gap-2">
+                  <CheckCircle size={16} className="text-green-600 mt-0.5 shrink-0" />
+                  <span>Jejum de 8 horas.</span>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs text-gray-600">
+            <div className="flex items-center gap-2 mb-2 font-bold text-[#050a30]">
+              <MapPin size={16} className="text-[#04a7bd]" /> Endereço da Clínica Gama Center
+            </div>
+            <p>Rua Barão de Pouso Alegre, 90, São Sebastião, Conselheiro Lafaiete (ao lado da Igreja São Sebastião).</p>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-gray-100 bg-gray-50 shrink-0 flex gap-3">
+          <Button onClick={handleCopy} className={`flex-1 h-12 text-base font-bold shadow-md transition-all ${copied ? '!bg-green-600 hover:!bg-green-700 !text-white' : '!bg-blue-50 !text-blue-700 border border-blue-200 hover:!bg-blue-100 hover:border-blue-300'}`}>
+            {copied ? <><CheckCircle size={20} /> Copiado!</> : <><Copy size={20} /> Copiar Texto</>}
+          </Button>
+          <Button onClick={onClose} className="flex-1 h-12 text-base font-bold shadow-lg">
+            Entendido
+          </Button>
+        </div>
+      </GlassCard>
+    </div>
+  );
 };
 
 const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confirmText = "Confirmar", isWarning = false }: any) => {
@@ -194,8 +194,8 @@ const ConfirmationModal = ({ isOpen, title, message, onConfirm, onCancel, confir
           </div>
           <div className="flex gap-4 w-full">
             <button onClick={onCancel} className="flex-1 py-3.5 rounded-2xl bg-gray-100 font-bold text-gray-600 hover:bg-gray-200 transition-colors">Cancelar</button>
-            <button 
-              onClick={onConfirm} 
+            <button
+              onClick={onConfirm}
               className={`flex-1 py-3.5 rounded-2xl font-bold text-white shadow-lg transition-colors ${isWarning ? 'bg-yellow-500 hover:bg-yellow-600 shadow-yellow-500/20' : 'bg-[#04a7bd] hover:bg-[#038e9e] shadow-[#04a7bd]/20'}`}
             >
               {confirmText}
@@ -248,9 +248,9 @@ const IOSInput: React.FC<{
 
 const IOSSelect: React.FC<{
   label?: string;
-  value: string; 
+  value: string;
   displayValue?: string;
-  onChange: (val: string) => void; 
+  onChange: (val: string) => void;
   onSelect: (val: string, id?: string | number) => void;
   options: OptionItem[];
   placeholder?: string;
@@ -260,7 +260,7 @@ const IOSSelect: React.FC<{
 }> = ({ label, value, displayValue, onChange, onSelect, options, placeholder, required, disabled, icon }) => {
   const [showList, setShowList] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  
+
   const inputValue = displayValue !== undefined ? displayValue : value;
 
   useEffect(() => {
@@ -273,37 +273,37 @@ const IOSSelect: React.FC<{
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredOptions = options.filter(opt => 
+  const filteredOptions = options.filter(opt =>
     (opt.label || '').toLowerCase().includes((inputValue || '').toLowerCase())
   );
-  
-  const listToRender = (showList === true && document.activeElement !== wrapperRef.current?.querySelector('input')) 
-      ? options 
-      : filteredOptions;
-      
+
+  const listToRender = (showList === true && document.activeElement !== wrapperRef.current?.querySelector('input'))
+    ? options
+    : filteredOptions;
+
   const handleChevronClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!disabled) {
-        setShowList(prev => !prev);
-      }
+    e.stopPropagation();
+    if (!disabled) {
+      setShowList(prev => !prev);
+    }
   };
 
   return (
     <div ref={wrapperRef} className="relative w-full group">
       {label && <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">{label}</label>}
       <div className="relative transition-all duration-300 transform group-focus-within:scale-[1.01]">
-         <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 ${!disabled && 'group-focus-within:text-[#04a7bd]'}`}>
-            {icon || <Search size={18} />}
-         </div>
-         <input 
-            type="text" 
-            required={required}
-            value={inputValue}
-            disabled={disabled}
-            onChange={(e) => { onChange(e.target.value); setShowList(true); }}
-            onFocus={() => !disabled && setShowList(true)}
-            placeholder={placeholder}
-            className={`
+        <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 ${!disabled && 'group-focus-within:text-[#04a7bd]'}`}>
+          {icon || <Search size={18} />}
+        </div>
+        <input
+          type="text"
+          required={required}
+          value={inputValue}
+          disabled={disabled}
+          onChange={(e) => { onChange(e.target.value); setShowList(true); }}
+          onFocus={() => !disabled && setShowList(true)}
+          placeholder={placeholder}
+          className={`
               w-full bg-white/50 backdrop-blur-md border border-gray-100
               text-[#050a30] placeholder-gray-400 font-medium
               rounded-2xl py-4 pl-12 pr-10
@@ -311,27 +311,27 @@ const IOSSelect: React.FC<{
               transition-all duration-300
               ${disabled ? 'bg-gray-100/50 text-gray-400 cursor-not-allowed' : ''}
             `}
-          />
-          <div 
-            onClick={handleChevronClick}
-            className={`absolute inset-y-0 right-0 px-4 flex items-center cursor-pointer ${disabled ? 'pointer-events-none text-gray-300' : 'text-gray-400 hover:text-[#04a7bd]'}`}
-          >
-            <ChevronDown size={16} />
-          </div>
+        />
+        <div
+          onClick={handleChevronClick}
+          className={`absolute inset-y-0 right-0 px-4 flex items-center cursor-pointer ${disabled ? 'pointer-events-none text-gray-300' : 'text-gray-400 hover:text-[#04a7bd]'}`}
+        >
+          <ChevronDown size={16} />
+        </div>
       </div>
-      
+
       {showList && !disabled && (
         <div className="absolute z-50 w-full mt-2 bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.1)] max-h-56 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 p-1">
           {(document.activeElement === wrapperRef.current?.querySelector('input') && inputValue && listToRender.length === 0) ? (
             <div className="px-4 py-3 text-center text-gray-400 text-xs italic">
-                Sem resultados.
+              Sem resultados.
             </div>
           ) : (
             (inputValue && options.find(o => o.label === inputValue) && listToRender.length === 1 ? options : (listToRender.length > 0 ? listToRender : options)).map((opt) => (
-              <button 
-                key={opt.id} 
-                type="button" 
-                onClick={() => { onSelect(opt.label, opt.id); setShowList(false); }} 
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => { onSelect(opt.label, opt.id); setShowList(false); }}
                 className="w-full text-left px-4 py-3 hover:bg-[#04a7bd]/10 hover:text-[#04a7bd] rounded-xl transition-colors text-sm text-gray-700 font-medium flex items-center justify-between group-btn"
               >
                 {opt.label}
@@ -347,9 +347,9 @@ const IOSSelect: React.FC<{
 
 // Dummy Generate PDF Function (Placeholder for real implementation)
 const generatePDF = async (payload: any) => {
-    // In a real scenario, this would call an API
-    console.log("Generating PDF Payload:", payload);
-    return "https://example.com/aso-generated.pdf";
+  // In a real scenario, this would call an API
+  console.log("Generating PDF Payload:", payload);
+  return "https://example.com/aso-generated.pdf";
 };
 
 export default function AppointmentFormClient({ preSelectedColabId }: AppointmentFormClientProps) {
@@ -357,7 +357,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   const [mode, setMode] = useState<'search' | 'form'>('search');
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
-  const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
 
   // Modal State
@@ -368,18 +368,19 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     confirmText?: string;
     isWarning?: boolean;
     onConfirm: () => void;
-  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
   const [orientationModal, setOrientationModal] = useState<{
-      isOpen: boolean;
-      data: OrientationData | null;
+    isOpen: boolean;
+    data: OrientationData | null;
   }>({ isOpen: false, data: null });
 
   // Data Lists
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
-  
+  const [agendaFilters, setAgendaFilters] = useState({ tipo: '', unidade: '', nome: '', data: '', status: '' });
+
   // Hierarchy Data
   const [filteredSectors, setFilteredSectors] = useState<OptionItem[]>([]);
   const [filteredRoles, setFilteredRoles] = useState<OptionItem[]>([]);
@@ -387,7 +388,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   // Selection State
   const [colabSearchTerm, setColabSearchTerm] = useState('');
   const [selectedColabId, setSelectedColabId] = useState<string>('');
-  
+
   // Forms
   const [colabFormData, setColabFormData] = useState({
     nome: '',
@@ -395,9 +396,9 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     data_nascimento: '',
     sexo: 'M',
     setor: '',
-    setorId: '', 
+    setorId: '',
     funcao: '',
-    cargoId: ''  
+    cargoId: ''
   });
 
   const [appointmentData, setAppointmentData] = useState({
@@ -415,10 +416,10 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
 
   useEffect(() => {
     if (preSelectedColabId && colaboradores.length > 0) {
-        const target = colaboradores.find(c => c.id === preSelectedColabId);
-        if (target) {
-            handleSelectColab(target);
-        }
+      const target = colaboradores.find(c => c.id === preSelectedColabId);
+      if (target) {
+        handleSelectColab(target);
+      }
     }
   }, [preSelectedColabId, colaboradores]);
 
@@ -452,7 +453,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
           .from('colaboradores')
           .select('id, nome, cpf, data_nascimento, sexo, setor, setorid, cargo, cargos(nome), unidade')
           .in('unidade', unitIds);
-        
+
         // @ts-ignore
         setColaboradores(colabs || []);
         fetchAgenda(unitIds);
@@ -467,9 +468,9 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   };
 
   const fetchAgenda = async (unitIds: number[]) => {
-      const { data } = await supabase
-          .from('agendamentos')
-          .select(`
+    const { data } = await supabase
+      .from('agendamentos')
+      .select(`
             id, 
             data_atendimento, 
             status, 
@@ -482,12 +483,12 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
             colaborador_id,
             unidade
           `)
-          .in('unidade', unitIds)
-          .order('data_atendimento', { ascending: false })
-          .limit(50);
-      
-      // @ts-ignore
-      setAgenda(data || []);
+      .in('unidade', unitIds)
+      .order('data_atendimento', { ascending: false })
+      .limit(50);
+
+    // @ts-ignore
+    setAgenda(data || []);
   };
 
   const applyCPFMask = (val: string) => {
@@ -507,41 +508,41 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   // --- Hierarchy Logic ---
 
   const loadSectorsForUnit = async (unitId: number): Promise<OptionItem[]> => {
-      const { data } = await supabase.from('unidade_setor').select('id, setor(id, nome)').eq('unidade', unitId);
-      if (data) {
-          return data.map((item: any) => ({ id: item.setor.id, label: item.setor.nome })).sort((a,b) => a.label.localeCompare(b.label));
-      }
-      return [];
+    const { data } = await supabase.from('unidade_setor').select('id, setor(id, nome)').eq('unidade', unitId);
+    if (data) {
+      return data.map((item: any) => ({ id: item.setor.id, label: item.setor.nome })).sort((a, b) => a.label.localeCompare(b.label));
+    }
+    return [];
   };
 
   const loadRolesForSector = async (sectorId: number): Promise<OptionItem[]> => {
-      const { data } = await supabase.from('cargo_setor').select('id, cargos(id, nome)').eq('idsetor', sectorId);
-      if (data) {
-          return data.map((item: any) => ({ id: item.cargos.id, label: item.cargos.nome })).sort((a,b) => a.label.localeCompare(b.label));
-      }
-      return [];
+    const { data } = await supabase.from('cargo_setor').select('id, cargos(id, nome)').eq('idsetor', sectorId);
+    if (data) {
+      return data.map((item: any) => ({ id: item.cargos.id, label: item.cargos.nome })).sort((a, b) => a.label.localeCompare(b.label));
+    }
+    return [];
   };
 
   const handleUnitSelect = async (unitName: string, unitId: string | number | undefined) => {
-      if (!unitId) return;
-      const id = Number(unitId);
-      setUnitSearchTerm(unitName);
-      setAppointmentData(prev => ({ ...prev, unidade: id.toString(), unidadeId: id }));
-      if (appointmentData.unidadeId !== id) {
-          setColabFormData(prev => ({ ...prev, setor: '', setorId: '', funcao: '', cargoId: '' }));
-          setFilteredSectors([]);
-          setFilteredRoles([]);
-      }
-      const sectors = await loadSectorsForUnit(id);
-      setFilteredSectors(sectors);
+    if (!unitId) return;
+    const id = Number(unitId);
+    setUnitSearchTerm(unitName);
+    setAppointmentData(prev => ({ ...prev, unidade: id.toString(), unidadeId: id }));
+    if (appointmentData.unidadeId !== id) {
+      setColabFormData(prev => ({ ...prev, setor: '', setorId: '', funcao: '', cargoId: '' }));
+      setFilteredSectors([]);
+      setFilteredRoles([]);
+    }
+    const sectors = await loadSectorsForUnit(id);
+    setFilteredSectors(sectors);
   };
 
   const handleSectorSelect = async (sectorName: string, sectorId: string | number | undefined) => {
-      if (!sectorId) return;
-      const id = Number(sectorId);
-      setColabFormData(prev => ({ ...prev, setor: sectorName, setorId: id.toString(), funcao: '', cargoId: '' }));
-      const roles = await loadRolesForSector(id);
-      setFilteredRoles(roles);
+    if (!sectorId) return;
+    const id = Number(sectorId);
+    setColabFormData(prev => ({ ...prev, setor: sectorName, setorId: id.toString(), funcao: '', cargoId: '' }));
+    const roles = await loadRolesForSector(id);
+    setFilteredRoles(roles);
   };
 
   const handleSelectColab = async (colab: Colaborador) => {
@@ -551,45 +552,45 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     if (!currentUnitId && unidades.length > 0) currentUnitId = unidades[0].id;
 
     if (currentUnitId) {
-        const u = unidades.find(u => u.id === currentUnitId);
-        if (u) {
-            setUnitSearchTerm(u.nome_unidade);
-            setAppointmentData(prev => ({ ...prev, unidade: u.id.toString(), unidadeId: u.id }));
-            const sectors = await loadSectorsForUnit(u.id);
-            setFilteredSectors(sectors);
-            setFilteredRoles([]);
-            setColabFormData(prev => ({
-                ...prev,
-                nome: colab.nome,
-                cpf: applyCPFMask(colab.cpf || ''),
-                data_nascimento: colab.data_nascimento,
-                sexo: colab.sexo || 'M',
-                setor: '', setorId: '', funcao: '', cargoId: ''
-            }));
-        }
+      const u = unidades.find(u => u.id === currentUnitId);
+      if (u) {
+        setUnitSearchTerm(u.nome_unidade);
+        setAppointmentData(prev => ({ ...prev, unidade: u.id.toString(), unidadeId: u.id }));
+        const sectors = await loadSectorsForUnit(u.id);
+        setFilteredSectors(sectors);
+        setFilteredRoles([]);
+        setColabFormData(prev => ({
+          ...prev,
+          nome: colab.nome,
+          cpf: applyCPFMask(colab.cpf || ''),
+          data_nascimento: colab.data_nascimento,
+          sexo: colab.sexo || 'M',
+          setor: '', setorId: '', funcao: '', cargoId: ''
+        }));
+      }
     }
   };
 
   const startNew = () => {
-      setSelectedColabId('');
-      setColabFormData({ nome: '', cpf: '', data_nascimento: '', sexo: 'M', setor: '', setorId: '', funcao: '', cargoId: '' });
-      setAppointmentData(prev => ({ ...prev, tipo: 'Admissional', unidade: '', unidadeId: 0, observacoes: '' }));
-      setFilteredSectors([]);
-      setFilteredRoles([]);
-      setUnitSearchTerm('');
-      setMode('form');
+    setSelectedColabId('');
+    setColabFormData({ nome: '', cpf: '', data_nascimento: '', sexo: 'M', setor: '', setorId: '', funcao: '', cargoId: '' });
+    setAppointmentData(prev => ({ ...prev, tipo: 'Admissional', unidade: '', unidadeId: 0, observacoes: '' }));
+    setFilteredSectors([]);
+    setFilteredRoles([]);
+    setUnitSearchTerm('');
+    setMode('form');
   };
 
   const backToSearch = () => {
-      setMode('search');
-      setColabSearchTerm('');
+    setMode('search');
+    setColabSearchTerm('');
   };
 
   const handlePreSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
-    if (!appointmentData.unidadeId) { setMessage({type:'error', text: 'Selecione uma unidade.'}); return; }
-    if (!colabFormData.setorId || !colabFormData.cargoId) { setMessage({type:'error', text: 'Setor e Cargo são obrigatórios.'}); return; }
+    if (!appointmentData.unidadeId) { setMessage({ type: 'error', text: 'Selecione uma unidade.' }); return; }
+    if (!colabFormData.setorId || !colabFormData.cargoId) { setMessage({ type: 'error', text: 'Setor e Cargo são obrigatórios.' }); return; }
     setLoading(true);
     const cleanCPF = colabFormData.cpf.replace(/\D/g, '');
 
@@ -597,16 +598,16 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       if (!selectedColabId) {
         const { data: existingColab } = await supabase.from('colaboradores').select('*').eq('cpf', cleanCPF).maybeSingle();
         if (existingColab) {
-           setLoading(false);
-           setModalConfig({
-             isOpen: true,
-             isWarning: true,
-             title: 'CPF Já Cadastrado',
-             message: <span>O CPF <strong>{applyCPFMask(cleanCPF)}</strong> já pertence a <strong>{existingColab.nome}</strong>.<br/><br/>Deseja cadastrar <strong>{colabFormData.nome}</strong> para um exame atualizando o vínculo?</span>,
-             confirmText: 'Sim, Atualizar e Agendar',
-             onConfirm: () => { setModalConfig(prev => ({...prev, isOpen: false})); confirmAppointment(existingColab.id); }
-           });
-           return;
+          setLoading(false);
+          setModalConfig({
+            isOpen: true,
+            isWarning: true,
+            title: 'CPF Já Cadastrado',
+            message: <span>O CPF <strong>{applyCPFMask(cleanCPF)}</strong> já pertence a <strong>{existingColab.nome}</strong>.<br /><br />Deseja cadastrar <strong>{colabFormData.nome}</strong> para um exame atualizando o vínculo?</span>,
+            confirmText: 'Sim, Atualizar e Agendar',
+            onConfirm: () => { setModalConfig(prev => ({ ...prev, isOpen: false })); confirmAppointment(existingColab.id); }
+          });
+          return;
         }
       }
       setLoading(false);
@@ -624,7 +625,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       message: <span>Deseja agendar o colaborador <strong>{colabFormData.nome}</strong> para <strong>{appointmentData.data_atendimento}</strong>?</span>,
       confirmText: 'Confirmar Agendamento',
       isWarning: false,
-      onConfirm: () => { setModalConfig(prev => ({...prev, isOpen: false})); executeSaving(targetColabId); }
+      onConfirm: () => { setModalConfig(prev => ({ ...prev, isOpen: false })); executeSaving(targetColabId); }
     });
   };
 
@@ -662,28 +663,28 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         .maybeSingle();
 
       if (unitSectorLink) {
-          const { data: examsData } = await supabase
-            .from('exames_unidade')
-            .select('admissao, demissao, ret_trabalho, mud_riscos, periodicidade, exames(nome)')
-            .eq('unidade_setor', unitSectorLink.id);
-          
-          if (examsData) {
-              const currentType = appointmentData.tipo;
-              const filteredExams = examsData.filter((item: any) => {
-                  if (currentType === 'Admissional') return item.admissao === true;
-                  if (currentType === 'Demissional') return item.demissao === true;
-                  // Periódico logic: usually defined by existence of periodicidade or explicit flag. 
-                  // Based on schema, periodicidade is numeric. If > 0, it applies.
-                  if (currentType === 'Periódico' || currentType === 'Periódico Semestral' || currentType === 'Periódico Bienal') return item.periodicidade && Number(item.periodicidade) > 0;
-                  // Value in select is 'Retorno'
-                  if (currentType === 'Retorno') return item.ret_trabalho === true;
-                  // Value in select is 'Mudança'
-                  if (currentType === 'Mudança') return item.mud_riscos === true;
-                  return false;
-              });
+        const { data: examsData } = await supabase
+          .from('exames_unidade')
+          .select('admissao, demissao, ret_trabalho, mud_riscos, periodicidade, exames(nome)')
+          .eq('unidade_setor', unitSectorLink.id);
 
-              examsList = filteredExams.map((item: any) => item.exames?.nome).filter(Boolean);
-          }
+        if (examsData) {
+          const currentType = appointmentData.tipo;
+          const filteredExams = examsData.filter((item: any) => {
+            if (currentType === 'Admissional') return item.admissao === true;
+            if (currentType === 'Demissional') return item.demissao === true;
+            // Periódico logic: usually defined by existence of periodicidade or explicit flag. 
+            // Based on schema, periodicidade is numeric. If > 0, it applies.
+            if (currentType === 'Periódico' || currentType === 'Periódico Semestral' || currentType === 'Periódico Bienal') return item.periodicidade && Number(item.periodicidade) > 0;
+            // Value in select is 'Retorno'
+            if (currentType === 'Retorno') return item.ret_trabalho === true;
+            // Value in select is 'Mudança'
+            if (currentType === 'Mudança') return item.mud_riscos === true;
+            return false;
+          });
+
+          examsList = filteredExams.map((item: any) => item.exames?.nome).filter(Boolean);
+        }
       }
 
       const selectedUnidade = unidades.find(u => u.id === appointmentData.unidadeId);
@@ -691,7 +692,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         empresa: selectedUnidade?.nome_unidade || "Matriz",
         nome: colabFormData.nome,
         dataExame: appointmentData.data_atendimento,
-        cpf: cleanCPF, 
+        cpf: cleanCPF,
         tipoExame: appointmentData.tipo,
         exames_requisitados: examsList
       });
@@ -712,12 +713,12 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       if (error) throw error;
 
       setOrientationModal({
-          isOpen: true,
-          data: {
-              patientName: colabFormData.nome,
-              date: appointmentData.data_atendimento,
-              exams: examsList
-          }
+        isOpen: true,
+        data: {
+          patientName: colabFormData.nome,
+          date: appointmentData.data_atendimento,
+          exams: examsList
+        }
       });
 
     } catch (err: any) {
@@ -729,161 +730,235 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   };
 
   const handleOrientationClose = async () => {
-      setOrientationModal({ isOpen: false, data: null });
-      setMessage({ type: 'success', text: 'Agendamento realizado com sucesso!' });
-      fetchAgenda(unidades.map(u => u.id)); 
-      backToSearch(); 
+    setOrientationModal({ isOpen: false, data: null });
+    setMessage({ type: 'success', text: 'Agendamento realizado com sucesso!' });
+    fetchAgenda(unidades.map(u => u.id));
+    backToSearch();
   };
 
   const handleOpenOrientationFromAgenda = (item: AgendaItem) => {
-      setOrientationModal({
-          isOpen: true,
-          data: {
-              patientName: item.colaborador?.nome || 'Paciente',
-              date: item.data_atendimento,
-              exams: item.exames_snapshot || []
-          }
-      });
+    setOrientationModal({
+      isOpen: true,
+      data: {
+        patientName: item.colaborador?.nome || 'Paciente',
+        date: item.data_atendimento,
+        exams: item.exames_snapshot || []
+      }
+    });
   };
 
-  const filteredColabs = colaboradores.filter(c => 
-      (c.nome && c.nome.toLowerCase().includes(colabSearchTerm.toLowerCase())) || 
-      (c.cpf && c.cpf.includes(colabSearchTerm))
+  const filteredColabs = colaboradores.filter(c =>
+    (c.nome && c.nome.toLowerCase().includes(colabSearchTerm.toLowerCase())) ||
+    (c.cpf && c.cpf.includes(colabSearchTerm))
   );
 
   const unitOptions = unidades.map(u => ({ id: u.id, label: u.nome_unidade }));
 
+  const tiposExame = ['Admissional', 'Demissional', 'Periódico', 'Periódico Semestral', 'Periódico Bienal', 'Retorno', 'Mudança'];
+
+  const filteredAgenda = agenda.filter(item => {
+    const matchTipo = !agendaFilters.tipo || item.tipo === agendaFilters.tipo;
+    const matchUnidade = !agendaFilters.unidade || String(item.unidade) === agendaFilters.unidade;
+    const matchNome = !agendaFilters.nome || (item.colaborador?.nome || '').toLowerCase().includes(agendaFilters.nome.toLowerCase());
+    const matchData = !agendaFilters.data || item.data_atendimento === agendaFilters.data;
+    const matchStatus = !agendaFilters.status ||
+      (agendaFilters.status === 'aso_liberado' && !!item.aso_liberado) ||
+      (agendaFilters.status === 'agendado' && !item.aso_liberado);
+    return matchTipo && matchUnidade && matchNome && matchData && matchStatus;
+  });
+
+  const hasActiveFilters = agendaFilters.tipo || agendaFilters.unidade || agendaFilters.nome || agendaFilters.data || agendaFilters.status;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <ConfirmationModal 
-          isOpen={modalConfig.isOpen}
-          title={modalConfig.title}
-          message={modalConfig.message}
-          confirmText={modalConfig.confirmText}
-          isWarning={modalConfig.isWarning}
-          onConfirm={modalConfig.onConfirm}
-          onCancel={() => setModalConfig(prev => ({...prev, isOpen: false}))}
-        />
-        <OrientationModal 
-            isOpen={orientationModal.isOpen}
-            data={orientationModal.data}
-            onClose={handleOrientationClose}
-        />
+      <ConfirmationModal
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmText={modalConfig.confirmText}
+        isWarning={modalConfig.isWarning}
+        onConfirm={modalConfig.onConfirm}
+        onCancel={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+      />
+      <OrientationModal
+        isOpen={orientationModal.isOpen}
+        data={orientationModal.data}
+        onClose={handleOrientationClose}
+      />
 
-        {/* LEFT COLUMN: FORM */}
-        <div className="lg:col-span-5 xl:col-span-4 w-full">
-            <GlassCard className="p-6 relative overflow-visible min-h-[500px] flex flex-col">
-                {mode === 'search' && (
-                  <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-left-4 duration-300">
-                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-[#04a7bd]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#04a7bd]"><User size={32} /></div>
-                        <h2 className="text-xl font-bold text-[#050a30]">Identificar Colaborador</h2>
-                        <p className="text-sm text-gray-400 mt-1">Busque por nome/CPF ou cadastre novo</p>
-                     </div>
-                     <div className="relative mb-6">
-                        <IOSInput value={colabSearchTerm} onChange={setColabSearchTerm} placeholder="Buscar..." icon={<Search size={20} />} className="shadow-sm" />
-                        {colabSearchTerm && (
-                            <div className="absolute z-20 w-full mt-2 bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
-                                {filteredColabs.map(c => (
-                                    <button key={c.id} type="button" onClick={() => handleSelectColab(c)} className="w-full text-left px-5 py-4 hover:bg-[#04a7bd]/5 border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group">
-                                        <div><p className="font-bold text-[#050a30] text-sm group-hover:text-[#04a7bd]">{c.nome}</p><p className="text-xs text-gray-400 font-mono mt-0.5">{c.cpf}</p></div>
-                                        <ArrowRight size={16} className="text-gray-300 group-hover:text-[#04a7bd]" />
-                                    </button>
-                                ))}
-                                {filteredColabs.length === 0 && (
-                                    <div className="p-6 text-center"><p className="text-gray-400 text-sm mb-2">Nenhum colaborador encontrado.</p><button onClick={startNew} className="text-[#04a7bd] text-xs font-bold hover:underline">Cadastrar "{colabSearchTerm}"?</button></div>
-                                )}
-                            </div>
-                        )}
-                     </div>
-                     <div className="mt-auto"><div className="relative flex py-5 items-center"><div className="flex-grow border-t border-gray-100"></div><span className="flex-shrink-0 mx-4 text-gray-300 text-xs font-medium">OU</span><div className="flex-grow border-t border-gray-100"></div></div><Button variant="primary" onClick={startNew} className="w-full h-12 text-base font-bold shadow-md hover:shadow-lg transition-all"><Plus size={20} /> Novo Cadastro</Button></div>
+      {/* LEFT COLUMN: FORM */}
+      <div className="lg:col-span-5 xl:col-span-4 w-full">
+        <GlassCard className="p-6 relative overflow-visible min-h-[500px] flex flex-col">
+          {mode === 'search' && (
+            <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-left-4 duration-300">
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-[#04a7bd]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#04a7bd]"><User size={32} /></div>
+                <h2 className="text-xl font-bold text-[#050a30]">Identificar Colaborador</h2>
+                <p className="text-sm text-gray-400 mt-1">Busque por nome/CPF ou cadastre novo</p>
+              </div>
+              <div className="relative mb-6">
+                <IOSInput value={colabSearchTerm} onChange={setColabSearchTerm} placeholder="Buscar..." icon={<Search size={20} />} className="shadow-sm" />
+                {colabSearchTerm && (
+                  <div className="absolute z-20 w-full mt-2 bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
+                    {filteredColabs.map(c => (
+                      <button key={c.id} type="button" onClick={() => handleSelectColab(c)} className="w-full text-left px-5 py-4 hover:bg-[#04a7bd]/5 border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group">
+                        <div><p className="font-bold text-[#050a30] text-sm group-hover:text-[#04a7bd]">{c.nome}</p><p className="text-xs text-gray-400 font-mono mt-0.5">{c.cpf}</p></div>
+                        <ArrowRight size={16} className="text-gray-300 group-hover:text-[#04a7bd]" />
+                      </button>
+                    ))}
+                    {filteredColabs.length === 0 && (
+                      <div className="p-6 text-center"><p className="text-gray-400 text-sm mb-2">Nenhum colaborador encontrado.</p><button onClick={startNew} className="text-[#04a7bd] text-xs font-bold hover:underline">Cadastrar "{colabSearchTerm}"?</button></div>
+                    )}
                   </div>
                 )}
+              </div>
+              <div className="mt-auto"><div className="relative flex py-5 items-center"><div className="flex-grow border-t border-gray-100"></div><span className="flex-shrink-0 mx-4 text-gray-300 text-xs font-medium">OU</span><div className="flex-grow border-t border-gray-100"></div></div><Button variant="primary" onClick={startNew} className="w-full h-12 text-base font-bold shadow-md hover:shadow-lg transition-all"><Plus size={20} /> Novo Cadastro</Button></div>
+            </div>
+          )}
 
-                {mode === 'form' && (
-                   <form onSubmit={handlePreSubmit} className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
-                       <div className="flex items-center justify-between pb-4 border-b border-gray-100/50">
-                          <button type="button" onClick={backToSearch} className="text-gray-400 hover:text-[#050a30] transition-colors flex items-center gap-1 text-xs font-bold uppercase tracking-wide"><ArrowRight size={14} className="rotate-180" /> Voltar</button>
-                          <h3 className="text-[#04a7bd] font-bold text-sm uppercase tracking-wider">{selectedColabId ? 'Editar & Agendar' : 'Novo Cadastro'}</h3>
-                       </div>
-                       {message && (
-                          <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                              <span className={`w-2 h-2 rounded-full ${message.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                              {message.text}
-                          </div>
-                       )}
-                       <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><User size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Dados Pessoais</span></div>
-                          <IOSInput value={colabFormData.nome} onChange={(v) => setColabFormData({...colabFormData, nome: v})} placeholder="Nome Completo" required readOnly={!!selectedColabId} />
-                          <IOSInput value={colabFormData.cpf} onChange={handleCPFChange} maxLength={14} placeholder="CPF (000.000.000-00)" required readOnly={!!selectedColabId} />
-                          <IOSInput type="date" value={colabFormData.data_nascimento} onChange={(v) => setColabFormData({...colabFormData, data_nascimento: v})} required className="w-full" readOnly={!!selectedColabId} />
-                          <div className={`relative h-14 group ${!!selectedColabId ? 'opacity-60 grayscale' : ''}`}>
-                             <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Sexo</label>
-                             <div className="relative">
-                                <select value={colabFormData.sexo} disabled={!!selectedColabId} onChange={(e) => setColabFormData({...colabFormData, sexo: e.target.value})} className="w-full bg-white/50 backdrop-blur-md border border-gray-100 rounded-2xl py-4 px-4 text-[#050a30] font-medium appearance-none focus:outline-none focus:border-[#04a7bd]/30 transition-all cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-100">
-                                   <option value="M">Masculino</option><option value="F">Feminino</option>
-                                </select>
-                                <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                             </div>
-                          </div>
-                       </div>
-                       <div className="space-y-3 pt-2">
-                          <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><Briefcase size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Vínculo Empresarial</span></div>
-                          <IOSSelect value={unitSearchTerm} onChange={(val) => setUnitSearchTerm(val)} onSelect={handleUnitSelect} options={unitOptions} placeholder="Selecionar Unidade" icon={<MapPin size={18} />} required />
-                          <IOSSelect displayValue={colabFormData.setor} value={colabFormData.setor} onChange={() => {}} onSelect={handleSectorSelect} options={filteredSectors} placeholder={filteredSectors.length ? "Selecionar Setor" : "Selecione Unidade..."} disabled={!appointmentData.unidadeId} icon={<Filter size={18} />} required />
-                          <IOSSelect displayValue={colabFormData.funcao} value={colabFormData.funcao} onChange={() => {}} onSelect={(val, id) => setColabFormData(prev => ({...prev, funcao: val, cargoId: id?.toString() || ''}))} options={filteredRoles} placeholder={filteredRoles.length ? "Selecionar Cargo" : "Selecione Setor..."} disabled={!colabFormData.setorId} icon={<Briefcase size={18} />} required />
-                       </div>
-                       <div className="space-y-3 pt-2">
-                           <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><Calendar size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Agendamento</span></div>
-                          <IOSInput type="date" label="Data do Exame" value={appointmentData.data_atendimento} onChange={(v) => setAppointmentData({...appointmentData, data_atendimento: v})} required />
-                          <div className="relative">
-                             <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Tipo de Exame</label>
-                             <div className="relative">
-                                 <select value={appointmentData.tipo} onChange={(e) => setAppointmentData({...appointmentData,tipo: e.target.value})} className="w-full bg-white/50 backdrop-blur-md border border-gray-100 rounded-2xl py-4 px-4 text-[#050a30] font-medium appearance-none focus:outline-none focus:border-[#04a7bd]/30 cursor-pointer">
-                                    <option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Periódico Semestral">Periódico Semestral</option><option value="Periódico Bienal">Periódico Bienal</option><option value="Retorno">Retorno ao Trabalho</option><option value="Mudança">Mudança de Função</option>
-                                 </select>
-                                 <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                             </div>
-                          </div>
-                          <IOSInput label="Observações (Opcional)" value={appointmentData.observacoes} onChange={(v) => setAppointmentData({...appointmentData, observacoes: v})} placeholder="Ex: Paciente com deficiência auditiva..." />
-                       </div>
-                       <div className="pt-4"><Button type="submit" className="w-full h-14 text-lg font-bold shadow-[0_10px_30px_rgba(4,167,189,0.2)] hover:shadow-[0_15px_40px_rgba(4,167,189,0.3)] transition-all transform active:scale-95" disabled={loading}>{loading ? 'Processando...' : <><Save size={20} /> Confirmar</>}</Button></div>
-                   </form> 
-                )}
-            </GlassCard>
-        </div>
+          {mode === 'form' && (
+            <form onSubmit={handlePreSubmit} className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100/50">
+                <button type="button" onClick={backToSearch} className="text-gray-400 hover:text-[#050a30] transition-colors flex items-center gap-1 text-xs font-bold uppercase tracking-wide"><ArrowRight size={14} className="rotate-180" /> Voltar</button>
+                <h3 className="text-[#04a7bd] font-bold text-sm uppercase tracking-wider">{selectedColabId ? 'Editar & Agendar' : 'Novo Cadastro'}</h3>
+              </div>
+              {message && (
+                <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  <span className={`w-2 h-2 rounded-full ${message.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                  {message.text}
+                </div>
+              )}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><User size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Dados Pessoais</span></div>
+                <IOSInput value={colabFormData.nome} onChange={(v) => setColabFormData({ ...colabFormData, nome: v })} placeholder="Nome Completo" required readOnly={!!selectedColabId} />
+                <IOSInput value={colabFormData.cpf} onChange={handleCPFChange} maxLength={14} placeholder="CPF (000.000.000-00)" required readOnly={!!selectedColabId} />
+                <IOSInput type="date" value={colabFormData.data_nascimento} onChange={(v) => setColabFormData({ ...colabFormData, data_nascimento: v })} required className="w-full" readOnly={!!selectedColabId} />
+                <div className={`relative h-14 group ${!!selectedColabId ? 'opacity-60 grayscale' : ''}`}>
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Sexo</label>
+                  <div className="relative">
+                    <select value={colabFormData.sexo} disabled={!!selectedColabId} onChange={(e) => setColabFormData({ ...colabFormData, sexo: e.target.value })} className="w-full bg-white/50 backdrop-blur-md border border-gray-100 rounded-2xl py-4 px-4 text-[#050a30] font-medium appearance-none focus:outline-none focus:border-[#04a7bd]/30 transition-all cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-100">
+                      <option value="M">Masculino</option><option value="F">Feminino</option>
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><Briefcase size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Vínculo Empresarial</span></div>
+                <IOSSelect value={unitSearchTerm} onChange={(val) => setUnitSearchTerm(val)} onSelect={handleUnitSelect} options={unitOptions} placeholder="Selecionar Unidade" icon={<MapPin size={18} />} required />
+                <IOSSelect displayValue={colabFormData.setor} value={colabFormData.setor} onChange={() => { }} onSelect={handleSectorSelect} options={filteredSectors} placeholder={filteredSectors.length ? "Selecionar Setor" : "Selecione Unidade..."} disabled={!appointmentData.unidadeId} icon={<Filter size={18} />} required />
+                <IOSSelect displayValue={colabFormData.funcao} value={colabFormData.funcao} onChange={() => { }} onSelect={(val, id) => setColabFormData(prev => ({ ...prev, funcao: val, cargoId: id?.toString() || '' }))} options={filteredRoles} placeholder={filteredRoles.length ? "Selecionar Cargo" : "Selecione Setor..."} disabled={!colabFormData.setorId} icon={<Briefcase size={18} />} required />
+              </div>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><Calendar size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Agendamento</span></div>
+                <IOSInput type="date" label="Data do Exame" value={appointmentData.data_atendimento} onChange={(v) => setAppointmentData({ ...appointmentData, data_atendimento: v })} required />
+                <div className="relative">
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Tipo de Exame</label>
+                  <div className="relative">
+                    <select value={appointmentData.tipo} onChange={(e) => setAppointmentData({ ...appointmentData, tipo: e.target.value })} className="w-full bg-white/50 backdrop-blur-md border border-gray-100 rounded-2xl py-4 px-4 text-[#050a30] font-medium appearance-none focus:outline-none focus:border-[#04a7bd]/30 cursor-pointer">
+                      <option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Periódico Semestral">Periódico Semestral</option><option value="Periódico Bienal">Periódico Bienal</option><option value="Retorno">Retorno ao Trabalho</option><option value="Mudança">Mudança de Função</option>
+                    </select>
+                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+                <IOSInput label="Observações (Opcional)" value={appointmentData.observacoes} onChange={(v) => setAppointmentData({ ...appointmentData, observacoes: v })} placeholder="Ex: Paciente com deficiência auditiva..." />
+              </div>
+              <div className="pt-4"><Button type="submit" className="w-full h-14 text-lg font-bold shadow-[0_10px_30px_rgba(4,167,189,0.2)] hover:shadow-[0_15px_40px_rgba(4,167,189,0.3)] transition-all transform active:scale-95" disabled={loading}>{loading ? 'Processando...' : <><Save size={20} /> Confirmar</>}</Button></div>
+            </form>
+          )}
+        </GlassCard>
+      </div>
 
-        {/* RIGHT COLUMN: AGENDA */}
-        <div className="lg:col-span-7 xl:col-span-8 w-full h-full flex flex-col">
-            <GlassCard className="p-6 h-full min-h-[600px] flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-[#050a30] flex items-center gap-2"><Calendar className="text-[#04a7bd]" /> Agenda de Exames</h2>
+      {/* RIGHT COLUMN: AGENDA */}
+      <div className="lg:col-span-7 xl:col-span-8 w-full h-full flex flex-col">
+        <GlassCard className="p-6 h-full min-h-[600px] flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-[#050a30] flex items-center gap-2"><Calendar className="text-[#04a7bd]" /> Agenda de Exames</h2>
+            {hasActiveFilters && (
+              <button onClick={() => setAgendaFilters({ tipo: '', unidade: '', nome: '', data: '', status: '' })} className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                <Filter size={12} /> Limpar Filtros
+              </button>
+            )}
+          </div>
+
+          {/* FILTROS */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="relative">
+              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="date"
+                value={agendaFilters.data}
+                onChange={(e) => setAgendaFilters(p => ({ ...p, data: e.target.value }))}
+                className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium"
+              />
+            </div>
+            <div className="relative">
+              <select
+                value={agendaFilters.tipo}
+                onChange={(e) => setAgendaFilters(p => ({ ...p, tipo: e.target.value }))}
+                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white hover:bg-gray-50 focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium appearance-none cursor-pointer transition-colors"
+              >
+                <option value="">Todos os tipos de exame</option>
+                {tiposExame.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={agendaFilters.unidade}
+                onChange={(e) => setAgendaFilters(p => ({ ...p, unidade: e.target.value }))}
+                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white hover:bg-gray-50 focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium appearance-none cursor-pointer transition-colors"
+              >
+                <option value="">Todas as unidades</option>
+                {unidades.map(u => <option key={u.id} value={String(u.id)}>{u.nome_unidade}</option>)}
+              </select>
+              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={agendaFilters.status}
+                onChange={(e) => setAgendaFilters(p => ({ ...p, status: e.target.value }))}
+                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white hover:bg-gray-50 focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium appearance-none cursor-pointer transition-colors"
+              >
+                <option value="">Todos os status</option>
+                <option value="agendado">Agendado</option>
+                <option value="aso_liberado">ASO Liberado</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {hasActiveFilters && (
+            <p className="text-[11px] text-gray-400 font-medium mb-3">
+              {filteredAgenda.length} resultado{filteredAgenda.length !== 1 ? 's' : ''} encontrado{filteredAgenda.length !== 1 ? 's' : ''}
+            </p>
+          )}
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+            {filteredAgenda.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 opacity-50"><Calendar size={48} className="mb-4 text-gray-300" /><p className="text-gray-400">{hasActiveFilters ? 'Nenhum resultado para os filtros aplicados.' : 'Nenhum exame agendado recentemente.'}</p></div>
+            ) : (
+              filteredAgenda.map((item) => (
+                <div key={item.id} onClick={() => handleOpenOrientationFromAgenda(item)} className="bg-white border border-gray-100 p-4 rounded-xl flex items-center justify-between hover:shadow-md transition-all hover:border-[#04a7bd]/30 cursor-pointer group">
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg w-14 h-14 border border-gray-200">
+                      <span className="text-[10px] text-gray-500 uppercase font-bold">{new Date(item.data_atendimento).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}</span>
+                      <span className="text-xl font-bold text-[#050a30]">{item.data_atendimento.split('-')[2]}</span>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-[#050a30] group-hover:text-[#04a7bd] transition-colors">{item.colaborador?.nome}</h4>
+                      <div className="flex gap-2 mt-1"><span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{item.tipo}</span><span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{item.unidade_info?.nome_unidade}</span></div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {item.aso_liberado ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">ASO Liberado</span> : <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">Agendado <Info size={12} /></span>}
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                    {agenda.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 opacity-50"><Calendar size={48} className="mb-4 text-gray-300"/><p className="text-gray-400">Nenhum exame agendado recentemente.</p></div>
-                    ) : (
-                        agenda.map((item) => (
-                           <div key={item.id} onClick={() => handleOpenOrientationFromAgenda(item)} className="bg-white border border-gray-100 p-4 rounded-xl flex items-center justify-between hover:shadow-md transition-all hover:border-[#04a7bd]/30 cursor-pointer group">
-                                <div className="flex items-center gap-4">
-                                    <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg w-14 h-14 border border-gray-200">
-                                        <span className="text-[10px] text-gray-500 uppercase font-bold">{new Date(item.data_atendimento).toLocaleDateString('pt-BR', { month: 'short' }).replace('.','')}</span>
-                                        <span className="text-xl font-bold text-[#050a30]">{item.data_atendimento.split('-')[2]}</span>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-lg font-bold text-[#050a30] group-hover:text-[#04a7bd] transition-colors">{item.colaborador?.nome}</h4>
-                                        <div className="flex gap-2 mt-1"><span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{item.tipo}</span><span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{item.unidade_info?.nome_unidade}</span></div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {item.aso_liberado ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">ASO Liberado</span> : <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">Agendado <Info size={12} /></span>}
-                                </div>
-                           </div>
-                        ))
-                    )}
-                </div>
-            </GlassCard>
-        </div>
+              ))
+            )}
+          </div>
+        </GlassCard>
+      </div>
     </div>
   );
 }
