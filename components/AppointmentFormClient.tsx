@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
-import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, Clock, CheckCircle, Filter, ArrowRight, Save, Info, Copy, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, Clock, CheckCircle, Filter, ArrowRight, Save, Info, Copy, AlertTriangle, Upload, Trash2, Image } from 'lucide-react';
 
 // --- Types ---
 
@@ -409,6 +409,10 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     observacoes: ''
   });
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [showPhotoPreview, setShowPhotoPreview] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
     fetchClientData();
@@ -578,12 +582,24 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
     setFilteredSectors([]);
     setFilteredRoles([]);
     setUnitSearchTerm('');
+    setSelectedPhoto(null);
     setMode('form');
   };
 
   const backToSearch = () => {
     setMode('search');
     setColabSearchTerm('');
+    setSelectedPhoto(null);
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedPhoto(e.target.files[0]);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   const handlePreSubmit = async (e: React.FormEvent) => {
@@ -697,6 +713,25 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         exames_requisitados: examsList
       });
 
+      let fotoObsUrl: string | null = null;
+      if (selectedPhoto) {
+        const fileExt = selectedPhoto.name.split('.').pop();
+        const fileName = `${finalColabId}_${Date.now()}.${fileExt}`;
+        const filePath = `agendamentos_obs/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(filePath, selectedPhoto);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl(filePath);
+
+        fotoObsUrl = publicUrlData.publicUrl;
+      }
+
       const { error } = await supabase.from('agendamentos').insert([{
         colaborador_id: finalColabId,
         data_atendimento: appointmentData.data_atendimento,
@@ -704,6 +739,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         unidade: appointmentData.unidadeId,
         exames_snapshot: examsList, // SAVING SNAPSHOT
         ficha_url: generatedUrl,
+        foto_obs: fotoObsUrl,
         status: 'pendente',
         recepcao: 'Aguardando',
         enviado_empresa: true,
@@ -732,6 +768,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
   const handleOrientationClose = async () => {
     setOrientationModal({ isOpen: false, data: null });
     setMessage({ type: 'success', text: 'Agendamento realizado com sucesso!' });
+    setSelectedPhoto(null);
     fetchAgenda(unidades.map(u => u.id));
     backToSearch();
   };
@@ -787,7 +824,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       />
 
       {/* LEFT COLUMN: FORM */}
-      <div className="lg:col-span-5 xl:col-span-4 w-full">
+      <div className="lg:col-span-5 xl:col-span-4 w-full relative z-[60]">
         <GlassCard className="p-6 relative overflow-visible min-h-[500px] flex flex-col">
           {mode === 'search' && (
             <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-left-4 duration-300">
@@ -861,7 +898,52 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                     <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
-                <IOSInput label="Observações (Opcional)" value={appointmentData.observacoes} onChange={(v) => setAppointmentData({ ...appointmentData, observacoes: v })} placeholder="Ex: Paciente com deficiência auditiva..." />
+                <div>
+                  <label class="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Observação</label>
+
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-[90%]">
+                    <IOSInput value={appointmentData.observacoes} onChange={(v) => setAppointmentData({ ...appointmentData, observacoes: v })} placeholder="Ex: Paciente com deficiência auditiva..." />
+                  </div>
+                  <div
+                    className="w-[10%] relative cursor-pointer flex items-center justify-center bg-transparent"
+                    onMouseEnter={() => {
+                      if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+                      setShowPhotoPreview(true);
+                    }}
+                    onMouseLeave={() => {
+                      previewTimeoutRef.current = setTimeout(() => setShowPhotoPreview(false), 1000);
+                    }}
+                  >
+                    {selectedPhoto ? (
+                      <>
+                        <Image size={22} className="text-[#04a7bd] hover:text-[#038e9e] transition-colors" />
+                        {showPhotoPreview && (
+                          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-[100] bg-white p-2 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-gray-100 w-72 animate-in fade-in zoom-in-95">
+                            <div className="relative">
+                              <img src={URL.createObjectURL(selectedPhoto)} alt="Preview" className="w-full h-48 rounded-lg object-cover" />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setSelectedPhoto(null); setShowPhotoPreview(false); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                                className="absolute top-2 right-2 bg-red-500/90 hover:bg-red-600 text-white p-1.5 rounded-lg shadow-lg backdrop-blur-sm transition-all"
+                                title="Remover anexo"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-center text-gray-500 mt-1 truncate">{selectedPhoto.name}</div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div onClick={handleUploadClick} className="flex items-center justify-center text-gray-400 hover:text-[#04a7bd] transition-all">
+                        <Upload size={20} />
+                      </div>
+                    )}
+                    <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/*" className="hidden" />
+                  </div>
+                </div>
               </div>
               <div className="pt-4"><Button type="submit" className="w-full h-14 text-lg font-bold shadow-[0_10px_30px_rgba(4,167,189,0.2)] hover:shadow-[0_15px_40px_rgba(4,167,189,0.3)] transition-all transform active:scale-95" disabled={loading}>{loading ? 'Processando...' : <><Save size={20} /> Confirmar</>}</Button></div>
             </form>

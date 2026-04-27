@@ -1813,14 +1813,31 @@ const CreateUserModal = ({ isOpen, company, onClose, loading }: { isOpen: boolea
     }
   }, [isOpen]);
 
-  // Effect for noEmail
+  // Efeito para gerar um e-mail automático único quando "Não utiliza e-mail" for marcado
   useEffect(() => {
+    // Se a opção de não usar e-mail estiver marcada
     if (noEmail) {
-      setEmail('email@email.com');
+      // Se houver um nome de usuário, gera o e-mail baseado nele para garantir unicidade no Auth
+      if (username) {
+        const sanitizedUsername = username
+          .toLowerCase()
+          .trim()
+          .normalize('NFD') // Normaliza para remover acentos
+          .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+          .replace(/[^a-z0-9.]/g, '.') // Mantém apenas letras, números e pontos
+          .replace(/\.+/g, '.') // Remove pontos duplicados
+          .replace(/^\.|\.$/g, ''); // Remove pontos no início ou fim
+
+        setEmail(`${sanitizedUsername}@acesso.gama.com.br`);
+      } else {
+        // Se ainda não houver username, deixa o e-mail vazio para validação posterior
+        setEmail('');
+      }
     } else {
+      // Se desmarcar "Não utiliza", limpa o campo para o usuário preencher manualmente
       setEmail('');
     }
-  }, [noEmail]);
+  }, [noEmail, username]);
 
   if (!isOpen || !company) return null;
 
