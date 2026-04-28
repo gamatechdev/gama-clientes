@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
-import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, Clock, CheckCircle, Filter, ArrowRight, Save, Info, Copy, AlertTriangle, Upload, Trash2, Image, FileText } from 'lucide-react';
+import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, Clock, CheckCircle, Filter, ArrowRight, Save, Info, Copy, AlertTriangle, Upload, Trash2, Image, FileText, ClipboardList } from 'lucide-react';
 
 // --- Types ---
 
@@ -166,11 +166,22 @@ const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: Or
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-100 bg-gray-50 shrink-0 flex gap-3">
-          <Button onClick={handleCopy} className={`flex-1 h-12 text-base font-bold shadow-md transition-all ${copied ? '!bg-green-600 hover:!bg-green-700 !text-white' : '!bg-blue-50 !text-blue-700 border border-blue-200 hover:!bg-blue-100 hover:border-blue-300'}`}>
-            {copied ? <><CheckCircle size={20} /> Copiado!</> : <><Copy size={20} /> Copiar Texto</>}
+        <div className="p-6 border-t border-gray-100 bg-white/50 shrink-0 flex gap-3">
+          <Button 
+            onClick={handleCopy} 
+            className={`flex-1 h-14 text-base font-bold transition-all duration-300 rounded-2xl border ${
+              copied 
+                ? '!bg-green-600 !text-white !border-green-700 shadow-lg' 
+                : '!bg-white !border-gray-200 !text-[#050a30] hover:!border-[#04a7bd] hover:!text-[#04a7bd] shadow-sm'
+            }`}
+          >
+            {copied ? (
+              <><CheckCircle size={20} className="animate-in zoom-in duration-300" /> Copiado!</>
+            ) : (
+              <><Copy size={20} /> Copiar Texto</>
+            )}
           </Button>
-          <Button onClick={onClose} className="flex-1 h-12 text-base font-bold shadow-lg">
+          <Button onClick={onClose} className="flex-1 h-14 text-base font-bold rounded-2xl shadow-[0_10px_25px_rgba(5,10,48,0.2)] hover:shadow-[0_15px_30px_rgba(5,10,48,0.3)] transition-all">
             Entendido
           </Button>
         </div>
@@ -259,9 +270,11 @@ const IOSSelect: React.FC<{
   icon?: React.ReactNode;
 }> = ({ label, value, displayValue, onChange, onSelect, options, placeholder, required, disabled, icon }) => {
   const [showList, setShowList] = useState(false);
+  const [internalSearch, setInternalSearch] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const inputValue = displayValue !== undefined ? displayValue : value;
+  const selectedLabel = displayValue !== undefined ? displayValue : value;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -273,72 +286,155 @@ const IOSSelect: React.FC<{
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (showList && searchInputRef.current) {
+      searchInputRef.current.focus();
+      setInternalSearch('');
+    }
+  }, [showList]);
+
   const filteredOptions = options.filter(opt =>
-    (opt.label || '').toLowerCase().includes((inputValue || '').toLowerCase())
+    (opt.label || '').toLowerCase().includes(internalSearch.toLowerCase())
   );
 
-  const listToRender = (showList === true && document.activeElement !== wrapperRef.current?.querySelector('input'))
-    ? options
-    : filteredOptions;
-
-  const handleChevronClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!disabled) {
-      setShowList(prev => !prev);
-    }
-  };
-
   return (
-    <div ref={wrapperRef} className="relative w-full group">
+    <div ref={wrapperRef} className={`relative w-full group ${showList ? 'z-[100]' : 'z-10'}`}>
       {label && <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">{label}</label>}
-      <div className="relative transition-all duration-300 transform group-focus-within:scale-[1.01]">
-        <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 ${!disabled && 'group-focus-within:text-[#04a7bd]'}`}>
+      
+      {/* TRIGGER */}
+      <div 
+        onClick={() => !disabled && setShowList(!showList)}
+        className={`
+          relative transition-all duration-300 transform group-focus-within:scale-[1.01] cursor-pointer
+          w-full bg-white border border-gray-100/50
+          text-[#050a30] font-bold rounded-2xl py-4 ${icon ? 'pl-12' : 'pl-5'} pr-10
+          shadow-sm hover:shadow-md
+          ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50 text-gray-400' : ''}
+          ${showList ? 'border-[#04a7bd]/40 ring-2 ring-[#04a7bd]/10' : ''}
+        `}
+      >
+        <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 ${showList ? 'text-[#04a7bd]' : ''}`}>
           {icon || <Search size={18} />}
         </div>
-        <input
-          type="text"
-          required={required}
-          value={inputValue}
-          disabled={disabled}
-          onChange={(e) => { onChange(e.target.value); setShowList(true); }}
-          onFocus={() => !disabled && setShowList(true)}
-          placeholder={placeholder}
-          className={`
-              w-full bg-white/50 backdrop-blur-md border border-gray-100
-              text-[#050a30] placeholder-gray-400 font-medium
-              rounded-2xl py-4 pl-12 pr-10
-              focus:outline-none focus:bg-white focus:shadow-[0_8px_30px_rgba(4,167,189,0.08)] focus:border-[#04a7bd]/30
-              transition-all duration-300
-              ${disabled ? 'bg-gray-100/50 text-gray-400 cursor-not-allowed' : ''}
-            `}
-        />
-        <div
-          onClick={handleChevronClick}
-          className={`absolute inset-y-0 right-0 px-4 flex items-center cursor-pointer ${disabled ? 'pointer-events-none text-gray-300' : 'text-gray-400 hover:text-[#04a7bd]'}`}
-        >
-          <ChevronDown size={16} />
+        
+        <span className={`block truncate ${!selectedLabel ? 'text-gray-400' : 'text-[#050a30]'}`}>
+          {selectedLabel || placeholder}
+        </span>
+
+        <div className="absolute inset-y-0 right-0 px-4 flex items-center">
+          <ChevronDown size={14} className={`transition-transform duration-300 ${showList ? 'rotate-180 text-[#04a7bd]' : 'text-gray-400'}`} />
         </div>
       </div>
 
+      {/* DROPDOWN POPOVER */}
       {showList && !disabled && (
-        <div className="absolute z-50 w-full mt-2 bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.1)] max-h-56 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 p-1">
-          {(document.activeElement === wrapperRef.current?.querySelector('input') && inputValue && listToRender.length === 0) ? (
-            <div className="px-4 py-3 text-center text-gray-400 text-xs italic">
-              Sem resultados.
+        <div className="absolute z-[100] w-full mt-2 bg-white rounded-[25px] shadow-[0_25px_60px_rgba(0,0,0,0.18)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-3 origin-top duration-200">
+          {/* Internal Search Bar - Matches Image */}
+          <div className="p-4 bg-white">
+            <div className="relative">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#04a7bd]" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={internalSearch}
+                onChange={(e) => setInternalSearch(e.target.value)}
+                placeholder="PESQUISAR..."
+                className="w-full pl-11 pr-4 py-2.5 bg-white border-2 border-[#04a7bd] rounded-full text-[10px] font-black tracking-widest text-[#050a30] placeholder-[#04a7bd]/50 focus:outline-none"
+              />
             </div>
-          ) : (
-            (inputValue && options.find(o => o.label === inputValue) && listToRender.length === 1 ? options : (listToRender.length > 0 ? listToRender : options)).map((opt) => (
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-64 overflow-y-auto custom-scrollbar-thick">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-10 text-center text-gray-400 text-[10px] font-black tracking-widest">
+                NENHUM RESULTADO
+              </div>
+            ) : (
+              filteredOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => { onSelect(opt.label, opt.id); setShowList(false); }}
+                  className={`w-full text-left px-6 py-4 transition-all text-[12px] font-black tracking-[0.15em] uppercase flex items-center justify-between last:rounded-b-[25px] ${selectedLabel === opt.label
+                      ? 'bg-[#04a7bd]/10 text-[#04a7bd]' 
+                      : 'text-[#5d7285] hover:bg-gray-50 hover:text-[#04a7bd]'
+                  }`}
+                >
+                  {opt.label}
+                  {selectedLabel === opt.label && <CheckCircle size={16} className="text-[#04a7bd]" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const IOSNativeSelect: React.FC<{
+  label?: string;
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string, label: string }[];
+  placeholder?: string;
+  disabled?: boolean;
+  icon?: React.ReactNode;
+  className?: string;
+  compact?: boolean;
+}> = ({ label, value, onChange, options, placeholder, disabled, icon, className = '', compact = false }) => {
+  const [show, setShow] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const clickOut = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setShow(false); };
+    document.addEventListener("mousedown", clickOut);
+    return () => document.removeEventListener("mousedown", clickOut);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value);
+
+  return (
+    <div ref={ref} className={`group relative ${className} ${show ? 'z-[100]' : 'z-10'}`}>
+      {label && <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">{label}</label>}
+      <div 
+        onClick={() => !disabled && setShow(!show)}
+        className={`
+          relative transition-all duration-300 transform group-focus-within:scale-[1.01] cursor-pointer
+          w-full bg-white border border-gray-100/50
+          text-[#050a30] font-bold rounded-2xl ${compact ? 'py-2.5 text-[11px]' : 'py-4 text-sm'} ${icon ? 'pl-12' : 'pl-5'} pr-10
+          shadow-sm hover:shadow-md
+          ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-100/50 text-gray-400' : ''}
+          ${show ? 'border-[#04a7bd]/40 ring-2 ring-[#04a7bd]/10' : ''}
+        `}
+      >
+        <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors duration-300 ${show ? 'text-[#04a7bd]' : ''}`}>
+          {icon}
+        </div>
+        <span className="block truncate">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown size={compact ? 12 : 14} className={`absolute right-4 top-1/2 -translate-y-1/2 transition-transform duration-300 ${show ? 'rotate-180 text-[#04a7bd]' : 'text-gray-400'}`} />
+      </div>
+
+      {show && !disabled && (
+        <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 origin-top duration-200">
+          <div className="max-h-60 overflow-y-auto custom-scrollbar">
+            {options.map((opt) => (
               <button
-                key={opt.id}
+                key={opt.value}
                 type="button"
-                onClick={() => { onSelect(opt.label, opt.id); setShowList(false); }}
-                className="w-full text-left px-4 py-3 hover:bg-[#04a7bd]/10 hover:text-[#04a7bd] rounded-xl transition-colors text-sm text-gray-700 font-medium flex items-center justify-between group-btn"
+                onClick={() => { onChange(opt.value); setShow(false); }}
+                className={`w-full text-left px-6 py-3.5 transition-all text-[11px] font-black tracking-widest uppercase flex items-center justify-between first:rounded-t-2xl last:rounded-b-2xl ${
+                  value === opt.value ? 'bg-[#04a7bd]/10 text-[#04a7bd]' : 'text-[#5d7285] hover:bg-gray-50'
+                }`}
               >
                 {opt.label}
-                {inputValue === opt.label && <CheckCircle size={14} className="text-[#04a7bd]" />}
+                {value === opt.value && <CheckCircle size={14} />}
               </button>
-            ))
-          )}
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -870,15 +966,17 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                 <IOSInput value={colabFormData.nome} onChange={(v) => setColabFormData({ ...colabFormData, nome: v })} placeholder="Nome Completo" required readOnly={!!selectedColabId} />
                 <IOSInput value={colabFormData.cpf} onChange={handleCPFChange} maxLength={14} placeholder="CPF (000.000.000-00)" required readOnly={!!selectedColabId} />
                 <IOSInput type="date" value={colabFormData.data_nascimento} onChange={(v) => setColabFormData({ ...colabFormData, data_nascimento: v })} required className="w-full" readOnly={!!selectedColabId} />
-                <div className={`relative h-14 group ${!!selectedColabId ? 'opacity-60 grayscale' : ''}`}>
-                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Sexo</label>
-                  <div className="relative">
-                    <select value={colabFormData.sexo} disabled={!!selectedColabId} onChange={(e) => setColabFormData({ ...colabFormData, sexo: e.target.value })} className="w-full bg-white/50 backdrop-blur-md border border-gray-100 rounded-2xl py-4 px-4 text-[#050a30] font-medium appearance-none focus:outline-none focus:border-[#04a7bd]/30 transition-all cursor-pointer disabled:cursor-not-allowed disabled:bg-gray-100">
-                      <option value="M">Masculino</option><option value="F">Feminino</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
+                <IOSNativeSelect
+                  label="Sexo"
+                  value={colabFormData.sexo}
+                  disabled={!!selectedColabId}
+                  onChange={(v) => setColabFormData({ ...colabFormData, sexo: v })}
+                  options={[
+                    { value: 'M', label: 'Masculino' },
+                    { value: 'F', label: 'Feminino' }
+                  ]}
+                  icon={<User size={14} />}
+                />
               </div>
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><Briefcase size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Vínculo Empresarial</span></div>
@@ -889,15 +987,21 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-2 text-[#050a30]/40 mb-1"><Calendar size={14} /> <span className="text-[10px] font-bold uppercase tracking-wider">Agendamento</span></div>
                 <IOSInput type="date" label="Data do Exame" value={appointmentData.data_atendimento} onChange={(v) => setAppointmentData({ ...appointmentData, data_atendimento: v })} required />
-                <div className="relative">
-                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Tipo de Exame</label>
-                  <div className="relative">
-                    <select value={appointmentData.tipo} onChange={(e) => setAppointmentData({ ...appointmentData, tipo: e.target.value })} className="w-full bg-white/50 backdrop-blur-md border border-gray-100 rounded-2xl py-4 px-4 text-[#050a30] font-medium appearance-none focus:outline-none focus:border-[#04a7bd]/30 cursor-pointer">
-                      <option value="Admissional">Admissional</option><option value="Demissional">Demissional</option><option value="Periódico">Periódico</option><option value="Periódico Semestral">Periódico Semestral</option><option value="Periódico Bienal">Periódico Bienal</option><option value="Retorno">Retorno ao Trabalho</option><option value="Mudança">Mudança de Função</option>
-                    </select>
-                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
+                <IOSNativeSelect
+                  label="Tipo de Exame"
+                  value={appointmentData.tipo}
+                  onChange={(v) => setAppointmentData({ ...appointmentData, tipo: v })}
+                  options={[
+                    { value: 'Admissional', label: 'Admissional' },
+                    { value: 'Demissional', label: 'Demissional' },
+                    { value: 'Periódico', label: 'Periódico' },
+                    { value: 'Periódico Semestral', label: 'Periódico Semestral' },
+                    { value: 'Periódico Bienal', label: 'Periódico Bienal' },
+                    { value: 'Retorno', label: 'Retorno ao Trabalho' },
+                    { value: 'Mudança', label: 'Mudança de Função' }
+                  ]}
+                  icon={<ClipboardList size={14} />}
+                />
                 <div>
                   <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Observação</label>
 
@@ -965,13 +1069,13 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       </div>
 
       {/* RIGHT COLUMN: AGENDA */}
-      <div className="lg:col-span-7 xl:col-span-8 w-full">
-        <GlassCard className="p-6 flex flex-col">
+      <div className="lg:col-span-7 xl:col-span-8 w-full relative z-[50]">
+        <GlassCard className="p-6 flex flex-col !overflow-visible min-h-[500px]">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-[#050a30] flex items-center gap-2"><Calendar className="text-[#04a7bd]" /> Agenda de Exames</h2>
             {hasActiveFilters && (
               <button onClick={() => setAgendaFilters({ tipo: '', unidade: '', nome: '', data: '', status: '' })} className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                <Filter size={12} /> Limpar Filtros
+                <Filter size={12} /> Limpar 
               </button>
             )}
           </div>
@@ -987,40 +1091,37 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                 className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium"
               />
             </div>
-            <div className="relative">
-              <select
-                value={agendaFilters.tipo}
-                onChange={(e) => setAgendaFilters(p => ({ ...p, tipo: e.target.value }))}
-                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white hover:bg-gray-50 focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium appearance-none cursor-pointer transition-colors"
-              >
-                <option value="">Todos os tipos de exame</option>
-                {tiposExame.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-            <div className="relative">
-              <select
-                value={agendaFilters.unidade}
-                onChange={(e) => setAgendaFilters(p => ({ ...p, unidade: e.target.value }))}
-                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white hover:bg-gray-50 focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium appearance-none cursor-pointer transition-colors"
-              >
-                <option value="">Todas as unidades</option>
-                {unidades.map(u => <option key={u.id} value={String(u.id)}>{u.nome_unidade}</option>)}
-              </select>
-              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-            <div className="relative">
-              <select
-                value={agendaFilters.status}
-                onChange={(e) => setAgendaFilters(p => ({ ...p, status: e.target.value }))}
-                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white hover:bg-gray-50 focus:outline-none focus:border-[#04a7bd] text-[#050a30] font-medium appearance-none cursor-pointer transition-colors"
-              >
-                <option value="">Todos os status</option>
-                <option value="agendado">Agendado</option>
-                <option value="aso_liberado">ASO Liberado</option>
-              </select>
-              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+            <IOSNativeSelect
+              value={agendaFilters.tipo}
+              onChange={(v) => setAgendaFilters(p => ({ ...p, tipo: v }))}
+              options={[
+                { value: '', label: 'Todos os tipos' },
+                ...tiposExame.map(t => ({ value: t, label: t }))
+              ]}
+              className="col-span-1"
+              compact
+            />
+            <IOSNativeSelect
+              value={agendaFilters.unidade}
+              onChange={(v) => setAgendaFilters(p => ({ ...p, unidade: v }))}
+              options={[
+                { value: '', label: 'Todas as unidades' },
+                ...unidades.map(u => ({ value: String(u.id), label: u.nome_unidade }))
+              ]}
+              className="col-span-1"
+              compact
+            />
+            <IOSNativeSelect
+              value={agendaFilters.status}
+              onChange={(v) => setAgendaFilters(p => ({ ...p, status: v }))}
+              options={[
+                { value: '', label: 'Todos os status' },
+                { value: 'agendado', label: 'Agendado' },
+                { value: 'aso_liberado', label: 'ASO Liberado' }
+              ]}
+              className="col-span-1"
+              compact
+            />
           </div>
 
           {hasActiveFilters && (
