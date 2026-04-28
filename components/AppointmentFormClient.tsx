@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
-import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, Clock, CheckCircle, Filter, ArrowRight, Save, Info, Copy, AlertTriangle, Upload, Trash2, Image } from 'lucide-react';
+import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, Clock, CheckCircle, Filter, ArrowRight, Save, Info, Copy, AlertTriangle, Upload, Trash2, Image, FileText } from 'lucide-react';
 
 // --- Types ---
 
@@ -106,9 +106,9 @@ const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: Or
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-300 p-4">
-      <GlassCard className="w-full max-w-lg p-0 bg-white border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh] [&>div.relative.z-10]:flex [&>div.relative.z-10]:flex-col [&>div.relative.z-10]:h-full [&>div.relative.z-10]:overflow-hidden">
+      <div className="w-full max-w-lg p-0 bg-white border-none shadow-2xl rounded-[20px] overflow-hidden flex flex-col max-h-[90vh]">
         <div className="bg-[#04a7bd] p-6 text-white text-center shrink-0">
-          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Info size={32} />
           </div>
           <h3 className="text-2xl font-bold">Detalhes do Agendamento</h3>
@@ -120,7 +120,7 @@ const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: Or
             <p>
               Exame Ocupacional do(a) paciente <strong className="text-lg">{data.patientName}</strong> está agendado para <strong className="text-lg">{formatDateFull(data.date)}</strong>, <strong className="text-lg">às 7:00</strong>.
             </p>
-            <p className="italic text-gray-500 mt-1 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100 inline-block">
+            <p className="italic text-gray-500 mt-2 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100 inline-block">
               Atendimento por ordem de chegada!
             </p>
           </div>
@@ -174,7 +174,7 @@ const OrientationModal = ({ isOpen, data, onClose }: { isOpen: boolean, data: Or
             Entendido
           </Button>
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 };
@@ -899,7 +899,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                   </div>
                 </div>
                 <div>
-                  <label class="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Observação</label>
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1.5 ml-1">Observação</label>
 
                 </div>
                 <div className="flex items-center gap-2">
@@ -918,11 +918,24 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                   >
                     {selectedPhoto ? (
                       <>
-                        <Image size={22} className="text-[#04a7bd] hover:text-[#038e9e] transition-colors" />
+                        <div className="relative inline-flex">
+                          {selectedPhoto.type === 'application/pdf' || selectedPhoto.name.toLowerCase().endsWith('.pdf') ? (
+                            <FileText size={24} className="text-green-500 transition-colors drop-shadow-sm" />
+                          ) : (
+                            <Image size={24} className="text-green-500 transition-colors drop-shadow-sm" />
+                          )}
+                          <div className="absolute -bottom-1.5 -right-1.5 bg-white rounded-full p-[1px] shadow-sm">
+                            <CheckCircle size={14} className="text-white fill-green-500" />
+                          </div>
+                        </div>
                         {showPhotoPreview && (
                           <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-[100] bg-white p-2 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-gray-100 w-72 animate-in fade-in zoom-in-95">
                             <div className="relative">
-                              <img src={URL.createObjectURL(selectedPhoto)} alt="Preview" className="w-full h-48 rounded-lg object-cover" />
+                              {selectedPhoto.type === 'application/pdf' || selectedPhoto.name.toLowerCase().endsWith('.pdf') ? (
+                                <iframe src={`${URL.createObjectURL(selectedPhoto)}#toolbar=0&navpanes=0&scrollbar=0`} title="PDF Preview" className="w-full h-48 rounded-lg border border-gray-200 pointer-events-none object-cover" />
+                              ) : (
+                                <img src={URL.createObjectURL(selectedPhoto)} alt="Preview" className="w-full h-48 rounded-lg object-cover" />
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setSelectedPhoto(null); setShowPhotoPreview(false); if (fileInputRef.current) fileInputRef.current.value = ''; }}
@@ -941,7 +954,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                         <Upload size={20} />
                       </div>
                     )}
-                    <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/*" className="hidden" />
+                    <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/*,application/pdf" className="hidden" />
                   </div>
                 </div>
               </div>
@@ -952,8 +965,8 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
       </div>
 
       {/* RIGHT COLUMN: AGENDA */}
-      <div className="lg:col-span-7 xl:col-span-8 w-full h-full flex flex-col">
-        <GlassCard className="p-6 h-full min-h-[600px] flex flex-col">
+      <div className="lg:col-span-7 xl:col-span-8 w-full">
+        <GlassCard className="p-6 flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-[#050a30] flex items-center gap-2"><Calendar className="text-[#04a7bd]" /> Agenda de Exames</h2>
             {hasActiveFilters && (
@@ -1016,7 +1029,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
             </p>
           )}
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+          <div className="max-h-[400px] overflow-y-auto custom-scrollbar pr-2 space-y-3">
             {filteredAgenda.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 opacity-50"><Calendar size={48} className="mb-4 text-gray-300" /><p className="text-gray-400">{hasActiveFilters ? 'Nenhum resultado para os filtros aplicados.' : 'Nenhum exame agendado recentemente.'}</p></div>
             ) : (
