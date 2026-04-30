@@ -3894,6 +3894,122 @@ export default function Dashboard({ session }: DashboardProps) {
 
   // --- Main Render ---
   const handleCompanyClick = (c: Cliente) => { setSelectedCompany(c); setView('units'); fetchUnits(c.id); };
+
+  const handleExportAllData = async () => {
+    try {
+      toast.info({ description: 'Preparando dados para exportação...' });
+
+      const { data: clients, error } = await supabase
+        .from('clientes')
+        .select(`
+          nome_fantasia,
+          razao_social,
+          cnpj,
+          unidades (
+            nome_unidade,
+            unidade_setor (
+              setor (
+                nome
+              ),
+              cargo_setor (
+                cargos (
+                  nome
+                )
+              )
+            )
+          )
+        `)
+        .order('nome_fantasia');
+
+      if (error) throw error;
+
+      const exportData: any[] = [];
+
+      clients?.forEach(client => {
+        if (!client.unidades || client.unidades.length === 0) {
+          exportData.push({
+            'Empresa': client.nome_fantasia || client.razao_social || '—',
+            'Razão Social': client.razao_social || '—',
+            'CNPJ': client.cnpj || '—',
+            'Unidade': '—',
+            'Setor': '—',
+            'Cargo': '—'
+          });
+          return;
+        }
+
+        client.unidades.forEach((unit: any) => {
+          if (!unit.unidade_setor || unit.unidade_setor.length === 0) {
+            exportData.push({
+              'Empresa': client.nome_fantasia || client.razao_social || '—',
+              'Razão Social': client.razao_social || '—',
+              'CNPJ': client.cnpj || '—',
+              'Unidade': unit.nome_unidade || '—',
+              'Setor': '—',
+              'Cargo': '—'
+            });
+            return;
+          }
+
+          unit.unidade_setor.forEach((us: any) => {
+            const sectorName = us.setor?.nome || '—';
+
+            if (!us.cargo_setor || us.cargo_setor.length === 0) {
+              exportData.push({
+                'Empresa': client.nome_fantasia || client.razao_social || '—',
+                'Razão Social': client.razao_social || '—',
+                'CNPJ': client.cnpj || '—',
+                'Unidade': unit.nome_unidade || '—',
+                'Setor': sectorName,
+                'Cargo': '—'
+              });
+              return;
+            }
+
+            us.cargo_setor.forEach((cs: any) => {
+              exportData.push({
+                'Empresa': client.nome_fantasia || client.razao_social || '—',
+                'Razão Social': client.razao_social || '—',
+                'CNPJ': client.cnpj || '—',
+                'Unidade': unit.nome_unidade || '—',
+                'Setor': sectorName,
+                'Cargo': cs.cargos?.nome || '—'
+              });
+            });
+          });
+        });
+      });
+
+      if (exportData.length === 0) {
+        toast.error({ description: 'Nenhum dado encontrado para exportar.' });
+        return;
+      }
+
+      // Generate Excel
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Base Completa");
+
+      // Auto-size columns (ajuste manual de larguras)
+      const colWidths = [
+        { wch: 40 }, // Empresa
+        { wch: 40 }, // Razão Social
+        { wch: 20 }, // CNPJ
+        { wch: 30 }, // Unidade
+        { wch: 25 }, // Setor
+        { wch: 25 }, // Cargo
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.writeFile(wb, `Base_Gama_Clientes_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success({ description: 'Base exportada com sucesso!' });
+
+    } catch (err: any) {
+      console.error(err);
+      toast.error({ description: 'Erro ao exportar: ' + err.message });
+    }
+  };
+
   const handleUnitClick = (u: Unidade) => { setSelectedUnit(u); setView('sectors'); fetchUnitSectors(u.id); fetchAllSectors(); };
   const handleSectorClick = (s: Setor) => { setSelectedSector(s); setView('cargos'); fetchSectorCargos(s.id); fetchAllCargos(); };
   const handleBack = () => {
@@ -4506,6 +4622,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     <>
                       <CompanySearch
                         onSearch={setSearchTerm}
+                        onExport={handleExportAllData}
                         isSearching={isFiltering}
                       />
 
