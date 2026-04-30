@@ -1859,9 +1859,8 @@ const CreateUserModal = ({ isOpen, company, onClose, loading }: { isOpen: boolea
 
       const { data: { publicUrl } } = supabase.storage.from('Media').getPublicUrl(filePath);
 
-      const supabaseUrl = 'https://blwbkhyqeyoyhdonwgaz.supabase.co';
-      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsd2JraHlxZXlveWhkb253Z2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NzQ4MTEsImV4cCI6MjA5MzA1MDgxMX0.0VLhDHeplcC-ZLwbXn2NU7vDDbocb0b4oHS3tm22VsY';
-      const tempClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+
+      const tempClient = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
       // Auth SignUp
       const { data: authData, error: authError } = await tempClient.auth.signUp({ email, password });
