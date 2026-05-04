@@ -106,16 +106,16 @@ export default function App() {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center h-full min-h-screen gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#04a7bd]"></div>
-          <p className="text-[#050a30]/50 text-sm font-medium animate-pulse">Conectando ao sistema...</p>
-        </div>
-      </Layout>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <Layout>
+  //       <div className="flex flex-col items-center justify-center h-full min-h-screen gap-4">
+  //         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#04a7bd]"></div>
+  //         <p className="text-[#050a30]/50 text-sm font-medium animate-pulse">Conectando ao sistema...</p>
+  //       </div>
+  //     </Layout>
+  //   );
+  // }
 
   // Render Logic:
   let content;

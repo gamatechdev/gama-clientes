@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Input } from '../../ui/GlassComponents';
-import { Search } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
+import { Button } from '../../ui/GlassComponents';
 
 interface CompanySearchProps {
   onSearch: (term: string) => void;
+  onExport?: () => void;
   isSearching?: boolean;
 }
 
@@ -14,7 +16,7 @@ interface CompanySearchProps {
  * 
  * Isso evita re-renders desnecessários no componente Dashboard durante a escrita.
  */
-export const CompanySearch: React.FC<CompanySearchProps> = ({ onSearch, isSearching }) => {
+export const CompanySearch: React.FC<CompanySearchProps> = ({ onSearch, onExport, isSearching }) => {
   const [inputValue, setInputValue] = useState('');
 
   useEffect(() => {
@@ -28,14 +30,24 @@ export const CompanySearch: React.FC<CompanySearchProps> = ({ onSearch, isSearch
   }, [inputValue, onSearch]);
 
   return (
-    <div className="mb-8">
+    <div className="mb-8 flex items-center gap-4">
       <Input 
         placeholder="Buscar empresa por nome, razão social ou CNPJ..." 
         icon={<Search size={22} className={isSearching ? 'animate-pulse text-[#04a7bd]' : ''} />} 
         value={inputValue} 
         onChange={(e) => setInputValue(e.target.value)} 
-        className="max-w-2xl" 
+        className="max-w-2xl flex-1" 
       />
+      {onExport && (
+        <Button 
+          onClick={onExport}
+          className="flex items-center gap-2 h-[54px] px-6 rounded-2xl bg-[#050a30] hover:bg-[#0d1654] text-white shadow-xl shadow-[#050a30]/10 shrink-0"
+          title="Exportar base completa para Excel"
+        >
+          <Download size={20} />
+          <span className="hidden sm:inline">Exportar Base</span>
+        </Button>
+      )}
     </div>
   );
 };

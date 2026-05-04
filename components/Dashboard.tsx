@@ -340,12 +340,12 @@ const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onTogg
       />
     </div>
     {/* Roles */}
-    {isSelected && sector.setor.cargo_setor && sector.setor.cargo_setor.length > 0 && (
+    {isSelected && sector.cargo_setor && sector.cargo_setor.length > 0 && (
       <>
         <div className="w-12 h-[2px] bg-gray-300 animate-line"></div>
         <div className="flex flex-col gap-6 relative">
-          {sector.setor.cargo_setor.length > 1 && <div className="absolute left-[-2px] top-[24px] bottom-[24px] w-[2px] bg-gray-300 origin-top animate-branch"></div>}
-          {sector.setor.cargo_setor.map((cargo: any, cIdx: number) => (
+          {sector.cargo_setor.length > 1 && <div className="absolute left-[-2px] top-[24px] bottom-[24px] w-[2px] bg-gray-300 origin-top animate-branch"></div>}
+          {sector.cargo_setor.map((cargo: any, cIdx: number) => (
             <CargoNode
               key={cargo.id}
               cargo={cargo}
@@ -358,7 +358,7 @@ const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onTogg
               onTriggerEditCargoDetails={onTriggerEditCargoDetails}
               onTriggerDeleteCargoLink={onTriggerDeleteCargoLink}
               cIdx={cIdx}
-              totalCargos={sector.setor.cargo_setor.length}
+              totalCargos={sector.cargo_setor.length}
               sectorLinkId={sector.id}
               onDragStart={onDragCargoStart}
               onDrop={onDropCargo}
@@ -370,7 +370,7 @@ const SectorNode = memo(({ sector, unitId, expandedColabs, loadingColabs, onTogg
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
-              onDropCargo(sector.id, sector.setor.cargo_setor.length);
+              onDropCargo(sector.id, sector.cargo_setor.length);
             }}
           ></div>
         </div>
@@ -1125,7 +1125,6 @@ const ExamAssignmentModal = ({ isOpen, sectorName, sectorLinkId, onClose, loadin
       });
       return;
     }
-
     // Validação de Aplicabilidade (Pelo menos uma checkbox deve estar ativa)
     const hasAnyFlag = formFlags.admissao || formFlags.demissao || formFlags.ret_trabalho || formFlags.mud_riscos || isPeriodicChecked;
     if (!hasAnyFlag) {
@@ -1860,9 +1859,8 @@ const CreateUserModal = ({ isOpen, company, onClose, loading }: { isOpen: boolea
 
       const { data: { publicUrl } } = supabase.storage.from('Media').getPublicUrl(filePath);
 
-      const supabaseUrl = 'https://wofipjazcxwxzzxjsflh.supabase.co';
-      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvZmlwamF6Y3h3eHp6eGpzZmxoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4MDA2NjcsImV4cCI6MjA3NDM3NjY2N30.gKjTEhXbrvRxKcn3cNvgMlbigXypbshDWyVaLqDjcpQ';
-      const tempClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+
+      const tempClient = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
       // Auth SignUp
       const { data: authData, error: authError } = await tempClient.auth.signUp({ email, password });
@@ -2337,7 +2335,10 @@ export default function Dashboard({ session }: DashboardProps) {
   // Collaborators overview modal state
   const [colabOverviewModal, setColabOverviewModal] = useState<{ isOpen: boolean, loading: boolean, data: { unidade: string, colabs: any[] }[] }>({ isOpen: false, loading: false, data: [] });
   const [colabOverviewSearch, setColabOverviewSearch] = useState('');
+  useEffect(() => {
+    console.log(selectedSectorNodeId);
 
+  }, [selectedSectorNodeId]);
   // Collaborator Edit Modal state
   const [editColabModal, setEditColabModal] = useState<{
     isOpen: boolean,
@@ -2358,7 +2359,6 @@ export default function Dashboard({ session }: DashboardProps) {
     selectedCargoId: '',
     saving: false
   });
-
   const openEditColab = async (colab: any) => {
     if (!hierarchyCompany) return;
     setEditColabModal(prev => ({
@@ -2905,61 +2905,59 @@ export default function Dashboard({ session }: DashboardProps) {
     setView('hierarchy');
     setHierarchyCompany(company);
     setHierarchyLoading(true);
-    // Reset canvas position
+
     panRef.current = { x: 0, y: 0 };
     setCanvasScale(1);
     if (canvasContentRef.current) canvasContentRef.current.style.transform = 'translate(0px, 0px) scale(1)';
     if (gridRef.current) gridRef.current.style.backgroundPosition = '0px 0px';
 
     try {
-      // Updated Query to include risks within unidad_setor
       const { data, error } = await supabase
         .from('unidades')
         .select(`
+        id,
+        nome_unidade,
+        unidade_setor (
           id,
-          nome_unidade,
-          unidade_setor (
+          setor (
             id,
-            setor (
+            nome
+          ),
+          cargo_setor (
+            id,
+            periodicidade,
+            descricao,
+            cargos (
+              id,
+              nome
+            )
+          ),
+          riscos_unidade (
+            id,
+            riscos (
               id,
               nome,
-              cargo_setor (
-                id,
-                periodicidade,
-                descricao,
-                cargos (
-                  id,
-                  nome
-                )
-              )
-            ),
-            riscos_unidade (
-                id,
-                riscos (
-                    id,
-                    nome,
-                    desc,
-                    tipo
-                )
-            ),
-            exames_unidade (
-                id,
-                periodicidade,
-                admissao,
-                demissao,
-                ret_trabalho,
-                mud_riscos,
-                exames (
-                    id,
-                    nome
-                )
+              desc,
+              tipo
+            )
+          ),
+          exames_unidade (
+            id,
+            periodicidade,
+            admissao,
+            demissao,
+            ret_trabalho,
+            mud_riscos,
+            exames (
+              id,
+              nome
             )
           )
-        `)
+        )
+      `)
         .eq('empresaid', company.id);
 
       if (error) throw error;
-      // @ts-ignore
       setHierarchyData(data || []);
     } catch (error: any) {
       console.error(error);
@@ -2976,49 +2974,49 @@ export default function Dashboard({ session }: DashboardProps) {
       const { data, error } = await supabase
         .from('unidades')
         .select(`
+        id,
+        nome_unidade,
+        unidade_setor (
           id,
-          nome_unidade,
-          unidade_setor (
+          setor (
             id,
-            setor (
+            nome
+          ),
+          cargo_setor (
+            id,
+            periodicidade,
+            descricao,
+            cargos (
+              id,
+              nome
+            )
+          ),
+          riscos_unidade (
+            id,
+            riscos (
               id,
               nome,
-              cargo_setor (
-                id,
-                periodicidade,
-                descricao,
-                cargos (
-                  id,
-                  nome
-                )
-              )
-            ),
-            riscos_unidade (
-                id,
-                riscos (
-                    id,
-                    nome,
-                    desc,
-                    tipo
-                )
-            ),
-            exames_unidade (
-                id,
-                periodicidade,
-                admissao,
-                demissao,
-                ret_trabalho,
-                mud_riscos,
-                exames (
-                    id,
-                    nome
-                )
+              desc,
+              tipo
+            )
+          ),
+          exames_unidade (
+            id,
+            periodicidade,
+            admissao,
+            demissao,
+            ret_trabalho,
+            mud_riscos,
+            exames (
+              id,
+              nome
             )
           )
-        `)
+        )
+      `)
         .eq('empresaid', hierarchyCompany.id);
+
       if (error) throw error;
-      // @ts-ignore
       setHierarchyData(data || []);
     } catch (error: any) {
       console.error(error);
@@ -3778,13 +3776,13 @@ export default function Dashboard({ session }: DashboardProps) {
         if (existing) {
           sectorIdToLink = existing.id;
         } else {
-          const { data: sec, error: secErr } = await supabase.from('setor').insert({ nome: data.value.trim() }).select().single();
+          const { data: sec, error: secErr } = await supabase.from('setor').upsert({ nome: data.value.trim() }).select().single();
           if (secErr || !sec) throw new Error('Erro ao criar setor base');
           sectorIdToLink = sec.id;
         }
       }
       if (!sectorIdToLink) throw new Error('ID do setor inválido');
-      const { error: linkErr } = await supabase.from('unidade_setor').insert({ unidade: unitId, setor: Number(sectorIdToLink) });
+      const { error: linkErr } = await supabase.from('unidade_setor').upsert({ unidade: unitId, setor: Number(sectorIdToLink) });
       if (linkErr) throw linkErr;
       setAddEntityModal(prev => ({ ...prev, loading: false, isOpen: false }));
       refreshCurrentView();
@@ -3800,12 +3798,12 @@ export default function Dashboard({ session }: DashboardProps) {
     try {
       let cargoIdToLink = data.id;
       if (data.mode === 'create' && data.value) {
-        const { data: cargo, error: cErr } = await supabase.from('cargos').insert({ nome: data.value, ativo: true }).select().single();
+        const { data: cargo, error: cErr } = await supabase.from('cargos').upsert({ nome: data.value, ativo: true }).select().single();
         if (cErr || !cargo) throw new Error('Erro ao criar cargo base');
         cargoIdToLink = cargo.id;
       }
       if (!cargoIdToLink) throw new Error('ID do cargo inválido');
-      const { error: linkErr } = await supabase.from('cargo_setor').insert({ idsetor: sectorId, idcargo: Number(cargoIdToLink) });
+      const { error: linkErr } = await supabase.from('cargo_setor').upsert({ idsetor: sectorId, idcargo: Number(cargoIdToLink), id_setor_filial: selectedSectorNodeId });
       if (linkErr) throw linkErr;
       setAddEntityModal(prev => ({ ...prev, loading: false, isOpen: false }));
       refreshCurrentView();
@@ -3896,6 +3894,122 @@ export default function Dashboard({ session }: DashboardProps) {
 
   // --- Main Render ---
   const handleCompanyClick = (c: Cliente) => { setSelectedCompany(c); setView('units'); fetchUnits(c.id); };
+
+  const handleExportAllData = async () => {
+    try {
+      toast.info({ description: 'Preparando dados para exportação...' });
+
+      const { data: clients, error } = await supabase
+        .from('clientes')
+        .select(`
+          nome_fantasia,
+          razao_social,
+          cnpj,
+          unidades (
+            nome_unidade,
+            unidade_setor (
+              setor (
+                nome
+              ),
+              cargo_setor (
+                cargos (
+                  nome
+                )
+              )
+            )
+          )
+        `)
+        .order('nome_fantasia');
+
+      if (error) throw error;
+
+      const exportData: any[] = [];
+
+      clients?.forEach(client => {
+        if (!client.unidades || client.unidades.length === 0) {
+          exportData.push({
+            'Empresa': client.nome_fantasia || client.razao_social || '—',
+            'Razão Social': client.razao_social || '—',
+            'CNPJ': client.cnpj || '—',
+            'Unidade': '—',
+            'Setor': '—',
+            'Cargo': '—'
+          });
+          return;
+        }
+
+        client.unidades.forEach((unit: any) => {
+          if (!unit.unidade_setor || unit.unidade_setor.length === 0) {
+            exportData.push({
+              'Empresa': client.nome_fantasia || client.razao_social || '—',
+              'Razão Social': client.razao_social || '—',
+              'CNPJ': client.cnpj || '—',
+              'Unidade': unit.nome_unidade || '—',
+              'Setor': '—',
+              'Cargo': '—'
+            });
+            return;
+          }
+
+          unit.unidade_setor.forEach((us: any) => {
+            const sectorName = us.setor?.nome || '—';
+
+            if (!us.cargo_setor || us.cargo_setor.length === 0) {
+              exportData.push({
+                'Empresa': client.nome_fantasia || client.razao_social || '—',
+                'Razão Social': client.razao_social || '—',
+                'CNPJ': client.cnpj || '—',
+                'Unidade': unit.nome_unidade || '—',
+                'Setor': sectorName,
+                'Cargo': '—'
+              });
+              return;
+            }
+
+            us.cargo_setor.forEach((cs: any) => {
+              exportData.push({
+                'Empresa': client.nome_fantasia || client.razao_social || '—',
+                'Razão Social': client.razao_social || '—',
+                'CNPJ': client.cnpj || '—',
+                'Unidade': unit.nome_unidade || '—',
+                'Setor': sectorName,
+                'Cargo': cs.cargos?.nome || '—'
+              });
+            });
+          });
+        });
+      });
+
+      if (exportData.length === 0) {
+        toast.error({ description: 'Nenhum dado encontrado para exportar.' });
+        return;
+      }
+
+      // Generate Excel
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Base Completa");
+
+      // Auto-size columns (ajuste manual de larguras)
+      const colWidths = [
+        { wch: 40 }, // Empresa
+        { wch: 40 }, // Razão Social
+        { wch: 20 }, // CNPJ
+        { wch: 30 }, // Unidade
+        { wch: 25 }, // Setor
+        { wch: 25 }, // Cargo
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.writeFile(wb, `Base_Gama_Clientes_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success({ description: 'Base exportada com sucesso!' });
+
+    } catch (err: any) {
+      console.error(err);
+      toast.error({ description: 'Erro ao exportar: ' + err.message });
+    }
+  };
+
   const handleUnitClick = (u: Unidade) => { setSelectedUnit(u); setView('sectors'); fetchUnitSectors(u.id); fetchAllSectors(); };
   const handleSectorClick = (s: Setor) => { setSelectedSector(s); setView('cargos'); fetchSectorCargos(s.id); fetchAllCargos(); };
   const handleBack = () => {
@@ -4137,6 +4251,8 @@ export default function Dashboard({ session }: DashboardProps) {
                                   onTriggerDeleteUnit={triggerDeleteUnit}
                                   isSelected={selectedUnitNodeId === unit.id}
                                   onSelect={(id, el) => {
+                                    console.log(id, el, unit.id);
+
                                     setSelectedUnitNodeId(id);
                                     setSelectedSectorNodeId(null); // Clear roles when switching unit
                                     if (id && el) centerOnNode(el);
@@ -4506,6 +4622,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     <>
                       <CompanySearch
                         onSearch={setSearchTerm}
+                        onExport={handleExportAllData}
                         isSearching={isFiltering}
                       />
 
