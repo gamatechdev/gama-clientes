@@ -2966,7 +2966,6 @@ export default function Dashboard({ session }: DashboardProps) {
     }
   }, []);
 
-
   // Refresh hierarchy data WITHOUT resetting canvas position.
   // Used after edits (periodicity, rename, risks, exams) so the user stays at their current pan/zoom.
   const refreshHierarchyData = useCallback(async () => {
