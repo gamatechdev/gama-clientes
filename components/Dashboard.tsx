@@ -3016,6 +3016,7 @@ export default function Dashboard({ session }: DashboardProps) {
       `)
         .eq('empresaid', hierarchyCompany.id);
 
+
       if (error) throw error;
       setHierarchyData(data || []);
     } catch (error: any) {
