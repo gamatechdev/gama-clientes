@@ -141,9 +141,9 @@ const CollaboratorsModal = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-      <GlassCard className="w-full max-w-3xl bg-white border-none shadow-2xl flex flex-col max-h-[85vh] p-0 overflow-hidden [&>div.relative.z-10]:flex [&>div.relative.z-10]:flex-col [&>div.relative.z-10]:h-full [&>div.relative.z-10]:overflow-hidden">
+      <div className="w-full max-w-3xl bg-white border-none shadow-2xl rounded-[20px] overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-[#04a7bd]/10 text-[#04a7bd] flex items-center justify-center">
               <Users size={24} />
@@ -211,7 +211,7 @@ const CollaboratorsModal = ({
             </div>
           )}
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 };
@@ -703,7 +703,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
 
       {/* --- SIDEBAR --- */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-80 bg-white/80 backdrop-blur-xl border-r border-gray-200 transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-[150] w-80 bg-white/80 backdrop-blur-xl border-r border-gray-200 transform transition-transform duration-300 ease-in-out
         lg:translate-x-0 lg:static flex flex-col
         ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
       `}>
@@ -756,7 +756,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[140] lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -765,7 +765,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
       <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#f8fafc]">
 
         {/* Top Header (Mobile Toggle) */}
-        <header className="h-16 lg:h-20 px-6 flex items-center justify-between shrink-0 bg-[#f8fafc]/80 backdrop-blur-sm z-20">
+        <header className="h-16 lg:h-2 px-6 flex items-center justify-between shrink-0 bg-[#f8fafc]/80 backdrop-blur-sm z-20">
           <div className="lg:hidden">
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-[#050a30] bg-white rounded-lg shadow-sm border border-gray-200">
               <Menu size={24} />
@@ -774,8 +774,8 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
         </header>
 
         {/* Content Scroll Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10 pt-0 w-full">
-          <div className="w-full h-full">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-4 pt-0 pb-20 w-full">
+          <div className="w-full">
 
             {/* VIEW: HOME */}
             {currentView === 'home' && (
@@ -811,13 +811,13 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
                 </div>
 
                 {/* Layout Grid: Quick Actions & Status Cards */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 w-full">
                   {/* Left Column: Quick Actions */}
                   <GlassCard className="p-8 border border-gray-200 !bg-white/60 h-full shadow-sm">
                     <div className="flex justify-between items-center mb-8">
                       <h3 className="font-bold text-2xl text-[#050a30]">Atalhos Rápidos</h3>
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <button onClick={() => setCurrentView('agendamento')} className="p-6 rounded-2xl bg-white border border-gray-200 hover:border-[#04a7bd] hover:shadow-lg transition-all text-left group">
                         <div className="p-4 bg-blue-50 text-blue-600 rounded-xl w-fit mb-4 group-hover:bg-[#04a7bd] group-hover:text-white transition-colors"><Calendar size={28} /></div>
                         <span className="font-bold text-lg text-[#050a30] block mb-1">Novo Agendamento</span>
@@ -833,8 +833,8 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
 
                   {/* Right Column: Dynamic Status Card */}
                   {stats.documentsIssueCount === 0 ? (
-                    <GlassCard className="p-8 border border-green-200 bg-gradient-to-br from-green-50/50 to-white/60 h-full flex flex-col items-center justify-center text-center shadow-sm">
-                      <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600 shadow-inner">
+                    <GlassCard className="p-8 pb-10 mb-0 border border-green-200 bg-gradient-to-br from-green-50/50 to-white/60 flex flex-col items-center justify-center text-center shadow-sm">
+                      <div className="w-12 h-12 bg-transparent border-none flex items-center justify-center mb-6 text-green-600">
                         <CheckCircle size={48} />
                       </div>
                       <h3 className="font-bold text-2xl text-[#050a30] mb-2">Tudo em dia!</h3>
@@ -847,7 +847,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
                       </div>
                     </GlassCard>
                   ) : (
-                    <GlassCard className="p-8 border border-red-200 bg-gradient-to-br from-red-50/50 to-white/60 h-full flex flex-col items-center justify-center text-center shadow-sm">
+                    <GlassCard className="p-8 border border-red-200 bg-gradient-to-br from-red-50/50 to-white/60 flex flex-col items-center justify-center text-center shadow-sm">
                       <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 text-red-600 shadow-inner animate-pulse">
                         <AlertTriangle size={48} />
                       </div>
@@ -878,10 +878,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
             {/* VIEW: ASOs */}
             {currentView === 'asos' && (
               <div className="animate-in fade-in slide-in-from-right-8 duration-500 h-full w-full">
-                <div className="mb-8">
-                  <h2 className="text-3xl font-bold text-[#050a30]">Consulta de ASOs</h2>
-                  <p className="text-gray-500 font-medium text-lg">Baixe os atestados de saúde ocupacional liberados.</p>
-                </div>
+
                 <ASOListClient onSchedule={handleNavigateToSchedule} />
               </div>
             )}
@@ -890,8 +887,8 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
             {currentView === 'documentos' && (
               <div className="animate-in fade-in slide-in-from-right-8 duration-500 h-full w-full">
                 <div className="mb-8">
-                  <h2 className="text-3xl font-bold text-[#050a30]">Documentos da Empresa</h2>
-                  <p className="text-gray-500 font-medium text-lg">Acesse e baixe os laudos técnicos vigentes de cada unidade.</p>
+                  <h2 className="text-3xl font-bold text-[#050a30] pt-4">Documentos da Empresa</h2>
+                  <p className="text-gray-500 font-medium text-lg pt-1">Acesse e baixe os laudos técnicos vigentes de cada unidade.</p>
                 </div>
 
                 {loadingProfile ? (
@@ -920,10 +917,10 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
                               </div>
                               <div>
                                 <h3 className="text-xl font-bold text-[#050a30] group-hover:text-[#04a7bd] transition-colors">{unit.nome_unidade}</h3>
-                                <p className="text-sm text-gray-500">{isExpanded ? 'Clique para recolher' : 'Clique para ver documentos'}</p>
+                                <p className="text-sm  pr-4 text-gray-500">{isExpanded ? 'Clique para recolher' : 'Clique para ver documentos'}</p>
                               </div>
                             </div>
-                            <div className={`p-2 rounded-full transition-all duration-300 ${isExpanded ? 'bg-gray-100 rotate-180 text-[#050a30]' : 'text-gray-400 group-hover:bg-gray-100 group-hover:text-[#050a30]'}`}>
+                            <div className={`p-2 p-4 rounded-full transition-all duration-300 ${isExpanded ? 'bg-gray-100 rotate-180 text-[#050a30]' : 'text-gray-400 group-hover:bg-gray-100 group-hover:text-[#050a30]'}`}>
                               <ChevronDown size={24} />
                             </div>
                           </div>
@@ -1007,10 +1004,10 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
         </div>
 
         {/* Floating Chat Button (Fixed Bottom Right) */}
-        <div className="fixed bottom-8 right-8 z-50">
+        <div className="fixed bottom-8 right-3 z-[200]">
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="w-16 h-16 rounded-full bg-[#04a7bd] text-white shadow-xl shadow-[#04a7bd]/30 hover:scale-110 hover:bg-[#038e9e] transition-all flex items-center justify-center border border-white/20 relative z-50"
+            className="w-16 h-16 rounded-full bg-[#04a7bd] text-white shadow-xl shadow-[#04a7bd]/30 cursor-pointer opacity-50 hover:opacity-85 hover:scale-110 hover:bg-[#038e9e] transition-all flex items-center justify-center border border-white/20 relative z-[200]"
           >
             {isChatOpen ? <ChevronDown size={32} /> : <MessageCircle size={32} />}
             {/* Notification Dot - Only if closed */}
@@ -1020,7 +1017,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
 
           {/* Chat Window */}
           {isChatOpen && (
-            <div className="absolute bottom-20 right-0 w-[380px] h-[600px] bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 origin-bottom-right z-40 max-w-[90vw]">
+            <div className="absolute bottom-20 right-0 w-[380px] h-[480px] bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 origin-bottom-right z-[190] max-w-[90vw]">
               {/* Chat Header */}
               <div className="bg-gradient-to-r from-[#04a7bd] to-[#038e9e] p-5 text-white flex items-center gap-4 shrink-0 shadow-md">
                 <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/30 shadow-sm">

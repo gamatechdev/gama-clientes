@@ -27,9 +27,9 @@ export default function App() {
     // Helper to fetch user role safely with timeout
     const fetchUserProfile = async (userId: string) => {
       try {
-        // Create a promise that rejects in 5 seconds
+        // Create a promise that rejects in 60 seconds
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Request timed out')), 5000)
+          setTimeout(() => reject(new Error('Request timed out')), 60000)
         );
 
         const fetchPromise = supabase

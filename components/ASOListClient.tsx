@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
-import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus, Filter, ClipboardList, Eye, FileCheck, MessageSquareText } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Briefcase, MapPin, User, ArrowRight, CreditCard, Building2, CheckCircle, Clock, AlertTriangle, X, History, ChevronRight, CalendarPlus, Filter, ClipboardList, Eye, FileCheck, MessageSquareText, Image } from 'lucide-react';
 
 // --- Interfaces ---
 
@@ -16,6 +16,7 @@ interface AsoItem {
   has_prontuario?: boolean;
   has_esoc?: boolean;
   observacoes?: string | null;
+  foto_obs?: string | null;
 }
 
 interface ColaboradorData {
@@ -75,7 +76,7 @@ const IOSInput: React.FC<{
   </div>
 );
 
-const HistoryModal = ({ isOpen, colaborador, onClose, onViewObs }: { isOpen: boolean, colaborador: ColaboradorData | null, onClose: () => void, onViewObs: (obs: string, name: string) => void }) => {
+const HistoryModal = ({ isOpen, colaborador, onClose, onViewObs, onViewAnexo }: { isOpen: boolean, colaborador: ColaboradorData | null, onClose: () => void, onViewObs: (obs: string, name: string) => void, onViewAnexo: (url: string, name: string) => void }) => {
     if (!isOpen || !colaborador) return null;
 
     const handleDownload = (url: string | null) => {
@@ -138,6 +139,18 @@ const HistoryModal = ({ isOpen, colaborador, onClose, onViewObs }: { isOpen: boo
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); if(item.foto_obs) onViewAnexo(item.foto_obs, colaborador?.nome || ''); }}
+                                        disabled={!item.foto_obs}
+                                        className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors shrink-0 border ${
+                                            item.foto_obs 
+                                                ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 cursor-pointer' 
+                                                : 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed opacity-50'
+                                        }`}
+                                        title={item.foto_obs ? 'Ver anexo' : 'Sem anexo'}
+                                    >
+                                        <Image size={16} />
+                                    </button>
                                     <button
                                         onClick={() => item.observacoes ? onViewObs(item.observacoes, colaborador?.nome || '') : undefined}
                                         disabled={!item.observacoes}
@@ -386,6 +399,55 @@ const ObservacoesModal = ({ isOpen, observacoes, patientName, onClose }: { isOpe
     );
 };
 
+const AnexoModal = ({ isOpen, url, patientName, onClose }: { isOpen: boolean, url: string, patientName: string, onClose: () => void }) => {
+    if (!isOpen || !url) return null;
+
+    const isPdf = url.toLowerCase().includes('.pdf');
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+            <GlassCard className="w-full max-w-2xl bg-white border-none shadow-2xl flex flex-col max-h-[90vh] p-0 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <Image size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-[#050a30]">Anexo</h3>
+                            <p className="text-xs text-gray-500">Colaborador: {patientName}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="flex-1 p-6 bg-[#f8fafc] flex flex-col items-center justify-center min-h-[450px] overflow-y-auto">
+                    {isPdf ? (
+                        <iframe 
+                            src={`${url}#toolbar=0&view=FitH`} 
+                            className="w-full max-w-[420px] h-[420px] rounded-xl border border-gray-200 shadow-lg bg-white" 
+                            title="Anexo PDF" 
+                        />
+                    ) : (
+                        <img 
+                            src={url} 
+                            alt="Anexo" 
+                            className="max-w-full max-h-[420px] w-auto h-auto object-contain rounded-xl shadow-lg border border-gray-200" 
+                        />
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-gray-100 bg-white shrink-0 flex justify-end">
+                    <Button onClick={() => window.open(url, '_blank')} className="h-10 px-4 text-sm font-bold !bg-[#04a7bd] hover:!bg-[#038e9e] text-white flex items-center gap-2 !shadow-none">
+                        <Download size={16} /> Baixar Arquivo
+                    </Button>
+                </div>
+            </GlassCard>
+        </div>
+    );
+};
+
 export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const [loading, setLoading] = useState(true);
   const [collaborators, setCollaborators] = useState<ColaboradorData[]>([]);
@@ -393,17 +455,25 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'valid' | 'expiring' | 'expired' | 'pending'>('all');
   const [clientConfig, setClientConfig] = useState({ envia_prontuario: false, envia_esoc: false });
   
+  // Pagination & Optimization State
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refData, setRefData] = useState<{ unitIds: number[], sectorMap: Map<string, number>, rulesMap: Map<string, number> } | null>(null);
+  const PAGE_SIZE = 20;
+
   // Modal State
   const [selectedColab, setSelectedColab] = useState<ColaboradorData | null>(null);
   const [prontuarioModal, setProntuarioModal] = useState<{ isOpen: boolean, agendamentoId: number, patientName: string }>({ isOpen: false, agendamentoId: 0, patientName: '' });
   const [esocModal, setEsocModal] = useState<{ isOpen: boolean, agendamentoId: number, patientName: string }>({ isOpen: false, agendamentoId: 0, patientName: '' });
   const [obsModal, setObsModal] = useState<{ isOpen: boolean, observacoes: string, patientName: string }>({ isOpen: false, observacoes: '', patientName: '' });
+  const [anexoModal, setAnexoModal] = useState<{ isOpen: boolean, url: string, patientName: string }>({ isOpen: false, url: '', patientName: '' });
 
   useEffect(() => {
-    fetchData();
+    fetchInitialData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchInitialData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -412,20 +482,12 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
       // 1. Get Client ID and Config
       const { data: userProfile } = await supabase
         .from('users')
-        .select(`
-            cliente_id,
-            clientes (
-                envia_prontuario,
-                envia_esoc
-            )
-        `)
+        .select(`cliente_id, clientes (envia_prontuario, envia_esoc)`)
         .eq('user_id', user.id)
         .single();
 
       if (!userProfile?.cliente_id) return;
 
-      // Set Client Config
-      // @ts-ignore
       const rawConfig = userProfile.clientes;
       const config = Array.isArray(rawConfig) ? rawConfig[0] : rawConfig;
 
@@ -434,152 +496,175 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
           envia_esoc: config?.envia_esoc === true
       });
 
-      // 2. Get Units
-      const { data: units } = await supabase.from('unidades').select('id').eq('empresaid', userProfile.cliente_id);
+      // 2. Parallel Fetch: Units, Sectors, Rules
+      const [unitsRes, setoresRes, rulesRes] = await Promise.all([
+          supabase.from('unidades').select('id').eq('empresaid', userProfile.cliente_id),
+          supabase.from('setor').select('id, nome'),
+          supabase.from('cargo_setor').select('idsetor, idcargo, periodicidade')
+      ]);
+
+      const units = unitsRes.data;
+      const setores = setoresRes.data;
+      const cargoSetorRules = rulesRes.data;
+
       if (!units || units.length === 0) { setLoading(false); return; }
       const unitIds = units.map(u => u.id);
 
-      // 3. Get Reference Tables
-      const { data: setores } = await supabase.from('setor').select('id, nome');
-      const { data: cargoSetorRules } = await supabase.from('cargo_setor').select('idsetor, idcargo, periodicidade');
-
-      // 4. Get Colaboradores (Primary Source - Tabela Colaboradores)
-      const { data: colabs } = await supabase
-        .from('colaboradores')
-        .select(`
-            id,
-            nome, 
-            cpf, 
-            setor,
-            cargo,
-            cargos(id, nome)
-        `)
-        .in('unidade', unitIds);
-
-      // 5. Get Agendamentos (Secondary Source - Linked by ID)
-      // Including both counts for logic
-      const { data: agendamentos, error: agError } = await supabase
-        .from('agendamentos')
-        .select(`
-          id,
-          data_atendimento,
-          aso_url,
-          aso_liberado,
-          tipo,
-          status,
-          colaborador_id,
-          observacoes,
-          unidade_info:unidades(nome_unidade),
-          prontuarios:prontuarios_agendamentos!prontuarios_agendamentos_agendamento_id_fkey(id),
-          esoc:esoc_agendamentos!esoc_agendamentos_agendamento_id_fkey(id)
-        `)
-        .in('unidade', unitIds)
-        .order('data_atendimento', { ascending: false });
-
-      if (agError) console.error("Error fetching agendamentos:", agError);
-
-      if (!colabs) { setLoading(false); return; }
-
-      // 6. Process Data: Map Collaborators first, then attach appointments
-      const colabMap = new Map<string, ColaboradorData>();
-
-      // Populate Map with ALL collaborators
-      colabs.forEach((c: any) => {
-          // Determine Periodicity based on Sector/Cargo rules
-          let periodicity = 12; // Default to 12 months
-          if (c.setor && setores && cargoSetorRules) {
-              const setorObj = setores.find((s: any) => s.nome.toLowerCase() === c.setor.toLowerCase());
-              if (setorObj) {
-                  const rule = cargoSetorRules.find((r: any) => r.idsetor === setorObj.id && r.idcargo === c.cargos?.id);
-                  if (rule && rule.periodicidade) {
-                      periodicity = rule.periodicidade;
-                  }
-              }
-          }
-
-          colabMap.set(c.id, {
-              id: c.id,
-              nome: c.nome,
-              cpf: c.cpf,
-              setor: c.setor,
-              cargo_id: c.cargos?.id,
-              cargo_nome: c.cargos?.nome || 'N/A',
-              historico: [],
-              status_validade: 'pending', 
-              periodicidade_meses: periodicity
-          });
-      });
-
-      // Attach Appointments to Collaborators
-      if (agendamentos) {
-          agendamentos.forEach((item: any) => {
-              const hasProntuario = item.prontuarios && item.prontuarios.length > 0;
-              const hasEsoc = item.esoc && item.esoc.length > 0;
-              
-              if (colabMap.has(item.colaborador_id)) {
-                  const colabEntry = colabMap.get(item.colaborador_id)!;
-                  colabEntry.historico.push({
-                      id: item.id,
-                      data_atendimento: item.data_atendimento,
-                      aso_url: item.aso_url,
-                      aso_liberado: item.aso_liberado,
-                      tipo: item.tipo,
-                      unidade_info: item.unidade_info,
-                      status_agendamento: item.status,
-                      has_prontuario: hasProntuario,
-                      has_esoc: hasEsoc,
-                      observacoes: item.observacoes
-                  });
-              }
-          });
+      // Create O(1) Lookups
+      const sectorMap = new Map<string, number>();
+      if (setores) {
+          setores.forEach(s => sectorMap.set(s.nome.toLowerCase(), s.id));
       }
 
-      // 7. Finalize Status for each collaborator
-      const processedList: ColaboradorData[] = Array.from(colabMap.values()).map(colab => {
-          // Sort history by date desc
-          if (colab.historico.length > 0) {
-              colab.historico.sort((a, b) => new Date(b.data_atendimento).getTime() - new Date(a.data_atendimento).getTime());
-              
-              const lastExam = colab.historico[0];
-              colab.ultimo_aso = lastExam;
+      const rulesMap = new Map<string, number>();
+      if (cargoSetorRules) {
+          cargoSetorRules.forEach(r => rulesMap.set(`${r.idsetor}_${r.idcargo}`, r.periodicidade));
+      }
 
-              // Parse Date YYYY-MM-DD
-              const [y, m, d] = lastExam.data_atendimento.split('-').map(Number);
-              const lastDate = new Date(y, m - 1, d);
-              
-              const dueDate = new Date(lastDate);
-              dueDate.setMonth(dueDate.getMonth() + colab.periodicidade_meses);
-              
-              colab.data_vencimento = dueDate;
+      const newRefData = { unitIds, sectorMap, rulesMap };
+      setRefData(newRefData);
 
-              const today = new Date();
-              today.setHours(0,0,0,0);
-              
-              const diffTime = dueDate.getTime() - today.getTime();
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              colab.dias_para_vencer = diffDays;
-
-              if (diffDays < 0) {
-                  colab.status_validade = 'expired';
-              } else if (diffDays <= 30) {
-                  colab.status_validade = 'expiring';
-              } else {
-                  colab.status_validade = 'valid';
-              }
-          } else {
-              colab.status_validade = 'pending';
-          }
-
-          return colab;
-      });
-
-      setCollaborators(processedList);
+      // Fetch first page
+      await fetchPage(0, newRefData, false);
 
     } catch (error) {
-      console.error("Erro ao processar dados:", error);
+      console.error("Erro na carga inicial:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchPage = async (pageNum: number, refs: { unitIds: number[], sectorMap: Map<string, number>, rulesMap: Map<string, number> }, isLoadMore: boolean) => {
+      if (!refs) return;
+      if (isLoadMore) setLoadingMore(true);
+
+      try {
+          const start = pageNum * PAGE_SIZE;
+          const end = start + PAGE_SIZE - 1;
+
+          // 1. Fetch Colabs for this page
+          const { data: colabs, count } = await supabase
+            .from('colaboradores')
+            .select(`id, nome, cpf, setor, cargo, cargos(id, nome)`, { count: 'exact' })
+            .in('unidade', refs.unitIds)
+            .order('nome', { ascending: true })
+            .range(start, end);
+
+          if (!colabs || colabs.length === 0) {
+              setHasMore(false);
+              return;
+          }
+
+          if (count && start + colabs.length >= count) {
+              setHasMore(false);
+          } else {
+              setHasMore(true);
+          }
+
+          const colabIds = colabs.map(c => c.id);
+
+          // 2. Fetch Agendamentos ONLY for these colabs
+          const { data: agendamentos, error: agError } = await supabase
+            .from('agendamentos')
+            .select(`
+              id, data_atendimento, aso_url, aso_liberado, tipo, status, colaborador_id, observacoes, foto_obs,
+              unidade_info:unidades(nome_unidade),
+              prontuarios:prontuarios_agendamentos!prontuarios_agendamentos_agendamento_id_fkey(id),
+              esoc:esoc_agendamentos!esoc_agendamentos_agendamento_id_fkey(id)
+            `)
+            .in('colaborador_id', colabIds)
+            .order('data_atendimento', { ascending: false });
+
+          if (agError) console.error("Error fetching agendamentos:", agError);
+
+          // 3. Process Data O(N)
+          const colabMap = new Map<string, ColaboradorData>();
+
+          colabs.forEach((c: any) => {
+              let periodicity = 12;
+              if (c.setor) {
+                  const sectorId = refs.sectorMap.get(c.setor.toLowerCase());
+                  if (sectorId && c.cargos?.id) {
+                      const rule = refs.rulesMap.get(`${sectorId}_${c.cargos.id}`);
+                      if (rule) periodicity = rule;
+                  }
+              }
+
+              colabMap.set(c.id, {
+                  id: c.id,
+                  nome: c.nome,
+                  cpf: c.cpf,
+                  setor: c.setor,
+                  cargo_id: c.cargos?.id,
+                  cargo_nome: c.cargos?.nome || 'N/A',
+                  historico: [],
+                  status_validade: 'pending', 
+                  periodicidade_meses: periodicity
+              });
+          });
+
+          if (agendamentos) {
+              agendamentos.forEach((item: any) => {
+                  if (colabMap.has(item.colaborador_id)) {
+                      const colabEntry = colabMap.get(item.colaborador_id)!;
+                      colabEntry.historico.push({
+                          id: item.id,
+                          data_atendimento: item.data_atendimento,
+                          aso_url: item.aso_url,
+                          aso_liberado: item.aso_liberado,
+                          tipo: item.tipo,
+                          unidade_info: item.unidade_info,
+                          status_agendamento: item.status,
+                          has_prontuario: item.prontuarios?.length > 0,
+                          has_esoc: item.esoc?.length > 0,
+                          observacoes: item.observacoes,
+                          foto_obs: item.foto_obs
+                      });
+                  }
+              });
+          }
+
+          const processedList: ColaboradorData[] = Array.from(colabMap.values()).map(colab => {
+              if (colab.historico.length > 0) {
+                  colab.historico.sort((a, b) => new Date(b.data_atendimento).getTime() - new Date(a.data_atendimento).getTime());
+                  const lastExam = colab.historico[0];
+                  colab.ultimo_aso = lastExam;
+
+                  const [y, m, d] = lastExam.data_atendimento.split('-').map(Number);
+                  const lastDate = new Date(y, m - 1, d);
+                  const dueDate = new Date(lastDate);
+                  dueDate.setMonth(dueDate.getMonth() + colab.periodicidade_meses);
+                  colab.data_vencimento = dueDate;
+
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  const diffTime = dueDate.getTime() - today.getTime();
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  colab.dias_para_vencer = diffDays;
+
+                  if (diffDays < 0) colab.status_validade = 'expired';
+                  else if (diffDays <= 30) colab.status_validade = 'expiring';
+                  else colab.status_validade = 'valid';
+              } else {
+                  colab.status_validade = 'pending';
+              }
+              return colab;
+          });
+
+          setCollaborators(prev => isLoadMore ? [...prev, ...processedList] : processedList);
+          setPage(pageNum);
+
+      } catch (error) {
+          console.error("Erro ao carregar página:", error);
+      } finally {
+          if (isLoadMore) setLoadingMore(false);
+      }
+  };
+
+  const handleLoadMore = () => {
+      if (!loadingMore && hasMore && refData) {
+          fetchPage(page + 1, refData, true);
+      }
   };
 
   const handleDownload = (e: React.MouseEvent, url: string | null) => {
@@ -600,6 +685,11 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   const handleOpenObs = (e: React.MouseEvent, observacoes: string | null | undefined, name: string) => {
       e.stopPropagation();
       setObsModal({ isOpen: true, observacoes: observacoes || '', patientName: name });
+  };
+
+  const handleOpenAnexo = (e: React.MouseEvent, url: string | null | undefined, name: string) => {
+      e.stopPropagation();
+      if(url) setAnexoModal({ isOpen: true, url, patientName: name });
   };
 
   const formatCPF = (cpf: string | null) => {
@@ -642,10 +732,16 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   ];
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+    <div className="  flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <AnexoModal 
+        isOpen={anexoModal.isOpen} 
+        url={anexoModal.url} 
+        patientName={anexoModal.patientName} 
+        onClose={() => setAnexoModal({ ...anexoModal, isOpen: false })} 
+      />
+
       {/* Header / Search - Added shrink-0 and min-h to prevent collapsing */}
-      <GlassCard className="p-8 mb-8 shrink-0 min-h-[220px] flex flex-col justify-center">
+      <GlassCard className="p-4 mb-4 shrink-0 flex flex-col justify-center">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
            <div>
              <h2 className="text-2xl font-bold text-[#050a30] flex items-center gap-2">
@@ -777,6 +873,19 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
                         )}
 
                         <button 
+                            onClick={(e) => handleOpenAnexo(e, colab.ultimo_aso?.foto_obs, colab.nome)}
+                            disabled={!colab.ultimo_aso?.foto_obs}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 border ${
+                                colab.ultimo_aso?.foto_obs 
+                                    ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 cursor-pointer' 
+                                    : 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed opacity-50'
+                            }`}
+                            title={colab.ultimo_aso?.foto_obs ? 'Ver anexo' : 'Sem anexo'}
+                        >
+                            <Image size={16} />
+                        </button>
+
+                        <button 
                             onClick={(e) => colab.ultimo_aso?.observacoes ? handleOpenObs(e, colab.ultimo_aso?.observacoes, colab.nome) : e.stopPropagation()}
                             disabled={!colab.ultimo_aso?.observacoes}
                             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 border ${
@@ -797,6 +906,26 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
              ))}
           </div>
         )}
+
+        {/* Load More Button */}
+        {hasMore && !loading && collaborators.length > 0 && (
+            <div className="mt-8 flex justify-center pb-8">
+                <Button 
+                    onClick={handleLoadMore} 
+                    disabled={loadingMore}
+                    className="w-full max-w-md h-12 rounded-2xl bg-white border border-[#04a7bd] text-[#04a7bd] hover:bg-[#04a7bd] hover:text-white shadow-sm hover:shadow-md transition-all font-bold flex items-center justify-center gap-2"
+                >
+                    {loadingMore ? (
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                            Carregando...
+                        </div>
+                    ) : (
+                        'Carregar Mais Colaboradores'
+                    )}
+                </Button>
+            </div>
+        )}
       </div>
 
       <HistoryModal 
@@ -804,6 +933,7 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
         colaborador={selectedColab} 
         onClose={() => setSelectedColab(null)}
         onViewObs={(obs, name) => setObsModal({ isOpen: true, observacoes: obs, patientName: name })}
+        onViewAnexo={(url, name) => setAnexoModal({ isOpen: true, url, patientName: name })}
       />
 
       <ProntuarioModal 
