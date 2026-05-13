@@ -765,7 +765,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
       <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#f8fafc]">
 
         {/* Top Header (Mobile Toggle) */}
-        <header className="h-16 lg:h-20 px-6 flex items-center justify-between shrink-0 bg-[#f8fafc]/80 backdrop-blur-sm z-20">
+        <header className="h-6 lg:h-6 px-4 pt-7 flex items-center justify-between shrink-0 bg-[#f8fafc]/80 backdrop-blur-sm z-20">
           <div className="lg:hidden">
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-[#050a30] bg-white rounded-lg shadow-sm border border-gray-200">
               <Menu size={24} />
@@ -774,7 +774,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
         </header>
 
         {/* Content Scroll Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10 pt-0 w-full">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10 pt-6 w-full">
           <div className="w-full h-full">
 
             {/* VIEW: HOME */}
@@ -867,8 +867,8 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
             {/* VIEW: AGENDAMENTO */}
             {currentView === 'agendamento' && (
               <div className="animate-in fade-in slide-in-from-right-8 duration-500 h-full w-full">
-                <div className="mb-8">
-                  <h2 className="text-3xl font-bold text-[#050a30]">Gestão de Exames</h2>
+                <div className="mb-8  mt-2">
+                  <h2 className="text-3xl font-bold  text-[#050a30]">Gestão de Exames</h2>
                   <p className="text-gray-500 font-medium text-lg">Agende novos exames ou consulte a agenda.</p>
                 </div>
                 <AppointmentFormClient preSelectedColabId={targetColabId} />
@@ -878,10 +878,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
             {/* VIEW: ASOs */}
             {currentView === 'asos' && (
               <div className="animate-in fade-in slide-in-from-right-8 duration-500 h-full w-full">
-                <div className="mb-8">
-                  <h2 className="text-3xl font-bold text-[#050a30]">Consulta de ASOs</h2>
-                  <p className="text-gray-500 font-medium text-lg">Baixe os atestados de saúde ocupacional liberados.</p>
-                </div>
+                
                 <ASOListClient onSchedule={handleNavigateToSchedule} />
               </div>
             )}
@@ -1010,7 +1007,7 @@ export default function ClientDashboard({ session }: ClientDashboardProps) {
         <div className="fixed bottom-8 right-8 z-50">
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="w-16 h-16 rounded-full bg-[#04a7bd] text-white shadow-xl shadow-[#04a7bd]/30 hover:scale-110 hover:bg-[#038e9e] transition-all flex items-center justify-center border border-white/20 relative z-50"
+            className={`w-16 h-16 rounded-full bg-[#04a7bd] text-white shadow-xl shadow-[#04a7bd]/30 hover:scale-110 hover:bg-[#038e9e] transition-all flex items-center justify-center border border-white/20 relative z-50 ${isChatOpen ? 'opacity-100' : 'opacity-60 hover:opacity-100'}`}
           >
             {isChatOpen ? <ChevronDown size={32} /> : <MessageCircle size={32} />}
             {/* Notification Dot - Only if closed */}
