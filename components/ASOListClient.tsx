@@ -642,7 +642,7 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
   ];
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex mt-2 flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Header / Search - Added shrink-0 and min-h to prevent collapsing */}
       <GlassCard className="p-8 mb-8 shrink-0 min-h-[220px] flex flex-col justify-center">
@@ -701,13 +701,15 @@ export default function ASOListClient({ onSchedule }: ASOListClientProps) {
               )}
           </GlassCard>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-12">
+          <div className="grid  grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-12">
              {filteredList.map((colab) => (
+
+                
                  <GlassCard 
                     key={colab.id} 
                     hoverEffect={true} 
                     onClick={() => setSelectedColab(colab)}
-                    className="flex flex-col gap-0 border border-gray-100/50 overflow-hidden p-0 h-full group min-h-[320px]"
+                    className="flex flex-col  gap-0 border border-gray-100/50 overflow-hidden p-0 h-full group min-h-[320px]"
                  >
                     {/* Status Header */}
                     <div className={`

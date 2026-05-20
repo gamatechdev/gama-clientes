@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { GlassCard, Button } from './ui/GlassComponents';
 import { ChevronDown, Search, Plus, Calendar, User, Briefcase, MapPin, Clock, CheckCircle, Filter, ArrowRight, Save, Info, Copy, AlertTriangle, Upload, Trash2, Image } from 'lucide-react';
+import { getServerTime } from '@/lib/serverTime';
 
 // --- Types ---
 
@@ -352,7 +353,28 @@ const generatePDF = async (payload: any) => {
   return "https://example.com/aso-generated.pdf";
 };
 
+
+
 export default function AppointmentFormClient({ preSelectedColabId }: AppointmentFormClientProps) {
+
+// useEffect para carregar hora do servidor
+const [currentTime, setCurrentTime] = useState<Date | null>(null);
+useEffect(() => {
+         async function loadTime(){
+           const res = await getServerTime();
+
+           setCurrentTime(res ? new Date(res) : new Date());
+         }
+      loadTime()
+        }, []);
+        console.log(currentTime);
+        
+        const isAfterDeadline = currentTime && currentTime.getHours() > 16;
+       
+       
+        console.log(isAfterDeadline);
+
+
   // State
   const [mode, setMode] = useState<'search' | 'form'>('search');
   const [loading, setLoading] = useState(false);
@@ -823,11 +845,66 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
         onClose={handleOrientationClose}
       />
 
+      
+        
+        
+
+       
+
       {/* LEFT COLUMN: FORM */}
-      <div className="lg:col-span-5 xl:col-span-4 w-full relative z-[60]">
-        <GlassCard className="p-6 relative overflow-visible min-h-[500px] flex flex-col">
+      <div className="lg:col-span-5 xl:col-span-4 w-full relative z-[20]">
+        <GlassCard className="p-6 bg-[#04a7bd]/10 h-full relative overflow-visible flex flex-col">
+            {/* Verificar se está dentro do horario de expediente */}
+            {isAfterDeadline ? (
+
+
+              //TELA DE BLOQUEIO (Visual Premium)
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-500">
+              <div className="relative mb-8">
+                {/* Efeito de brilho ao fundo do ícone */}
+                <div className="absolute inset-0 bg-red-500/20 blur-2xl rounded-full animate-pulse"></div>
+                <div className="relative w-24 h-24 bg-gradient-to-br from-red-500 to-red-600 rounded-3xl flex items-center justify-center shadow-xl shadow-red-500/20 transform rotate-3 transition-transform hover:rotate-0 duration-300">
+                  <Clock size={48} className="text-white" />
+                </div>
+              </div>
+              
+              <h2 className="text-2xl font-black text-[#050a30] mb-3 tracking-tight">
+                Agendamentos Encerrados
+              </h2>
+              
+              <div className="max-w-[280px] space-y-4">
+                <p className="text-gray-500 leading-relaxed font-medium">
+                  O horário limite para novos agendamentos hoje foi atingido às <span className="text-red-600 font-bold">16:00h</span>.
+                </p>
+                
+                <div className="flex items-center justify-center p-4 bg-white/50 backdrop-blur-sm rounded-2xl border border-red-100 shadow-sm">
+                <div className="flex items-center gap-3">
+                  {/* O ícone */}
+                  <Calendar size={38} className="text-[#04a7bd] flex-shrink-0" />
+                  
+                  {/* O texto */}
+                  <span className="text-[#050a30] text-sm font-semibold mt-2.5 ">
+                    Disponível amanhã às 07:00h
+                  </span>
+                </div>
+              </div>
+              </div>
+
+              <div className="mt-10 w-full">
+                <Button 
+                  onClick={() => window.location.href = '/'} 
+                  className="w-full !bg-white !text-gray-400 border border-gray-100 hover:!bg-gray-50 hover:!text-[#050a30] h-12 rounded-2xl font-bold transition-all shadow-sm"
+                >
+                  Voltar ao Painel
+                </Button>
+              </div>
+            </div>
+            ) :(
+
+              //TELA NORMAL DE AGENDAMENTO
+              <>
           {mode === 'search' && (
-            <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-left-4 duration-300">
+            <div className="flex-1 flex flex-col  animate-in fade-in slide-in-from-left-4 duration-300">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 bg-[#04a7bd]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#04a7bd]"><User size={32} /></div>
                 <h2 className="text-xl font-bold text-[#050a30]">Identificar Colaborador</h2>
@@ -836,7 +913,7 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
               <div className="relative mb-6">
                 <IOSInput value={colabSearchTerm} onChange={setColabSearchTerm} placeholder="Buscar..." icon={<Search size={20} />} className="shadow-sm" />
                 {colabSearchTerm && (
-                  <div className="absolute z-20 w-full mt-2 bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
+                  <div className="absolute z-20 w-full  mt-2 bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
                     {filteredColabs.map(c => (
                       <button key={c.id} type="button" onClick={() => handleSelectColab(c)} className="w-full text-left px-5 py-4 hover:bg-[#04a7bd]/5 border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center group">
                         <div><p className="font-bold text-[#050a30] text-sm group-hover:text-[#04a7bd]">{c.nome}</p><p className="text-xs text-gray-400 font-mono mt-0.5">{c.cpf}</p></div>
@@ -849,13 +926,13 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
                   </div>
                 )}
               </div>
-              <div className="mt-auto"><div className="relative flex py-5 items-center"><div className="flex-grow border-t border-gray-100"></div><span className="flex-shrink-0 mx-4 text-gray-300 text-xs font-medium">OU</span><div className="flex-grow border-t border-gray-100"></div></div><Button variant="primary" onClick={startNew} className="w-full h-12 text-base font-bold shadow-md hover:shadow-lg transition-all"><Plus size={20} /> Novo Cadastro</Button></div>
+              <div className="mt-auto"><div className="relative  flex py-5 items-center"><div className="flex-grow border-t border-gray-100"></div><span className="flex-shrink-0 mx-4 text-gray-300 text-xs font-medium">OU</span><div className="flex-grow border-t border-gray-100"></div></div><Button variant="primary" onClick={startNew} className="w-full h-12 text-base font-bold shadow-md hover:shadow-lg transition-all"><Plus size={20} /> Novo Cadastro</Button></div>
             </div>
           )}
-
+          
           {mode === 'form' && (
             <form onSubmit={handlePreSubmit} className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
-              <div className="flex items-center justify-between pb-4 border-b border-gray-100/50">
+              <div className="flex items-center justify-between  pb-4 border-b border-gray-100/50">
                 <button type="button" onClick={backToSearch} className="text-gray-400 hover:text-[#050a30] transition-colors flex items-center gap-1 text-xs font-bold uppercase tracking-wide"><ArrowRight size={14} className="rotate-180" /> Voltar</button>
                 <h3 className="text-[#04a7bd] font-bold text-sm uppercase tracking-wider">{selectedColabId ? 'Editar & Agendar' : 'Novo Cadastro'}</h3>
               </div>
@@ -948,12 +1025,14 @@ export default function AppointmentFormClient({ preSelectedColabId }: Appointmen
               <div className="pt-4"><Button type="submit" className="w-full h-14 text-lg font-bold shadow-[0_10px_30px_rgba(4,167,189,0.2)] hover:shadow-[0_15px_40px_rgba(4,167,189,0.3)] transition-all transform active:scale-95" disabled={loading}>{loading ? 'Processando...' : <><Save size={20} /> Confirmar</>}</Button></div>
             </form>
           )}
+          </>
+        )}
         </GlassCard>
       </div>
 
       {/* RIGHT COLUMN: AGENDA */}
-      <div className="lg:col-span-7 xl:col-span-8 w-full h-full flex flex-col">
-        <GlassCard className="p-6 h-full min-h-[600px] flex flex-col">
+      <div className="lg:col-span-7 xl:col-span-8 w-full  h-full flex flex-col">
+        <GlassCard className="p-6  min-h-[560px] max-h-[560px] flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-[#050a30] flex items-center gap-2"><Calendar className="text-[#04a7bd]" /> Agenda de Exames</h2>
             {hasActiveFilters && (
